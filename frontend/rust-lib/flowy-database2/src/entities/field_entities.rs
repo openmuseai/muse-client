@@ -404,7 +404,7 @@ pub struct FieldChangesetPB {
 /// or a list of values for a multi-select list. These options are defined within a specialization
 /// of the FieldTypeOption class.
 ///
-/// You could check [this](https://github.com/openmuseai/dsh-office/docs/essential-documentation/contribute-to-appflowy/architecture/frontend/grid#fieldtype)
+/// You could check [this](https://github.com/openmuseai/openmuse/docs/essential-documentation/contribute-to-appflowy/architecture/frontend/grid#fieldtype)
 /// for more information.
 ///
 /// The order of the enum can't be changed. If you want to add a new type,

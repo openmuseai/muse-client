@@ -428,7 +428,7 @@ class _ImportNotionButton extends StatelessWidget {
             ),
             onPressed: () {
               afLaunchUrlString(
-                'https://github.com/openmuseai/dsh-office/docs/guides/import-from-notion',
+                'https://github.com/openmuseai/openmuse/docs/guides/import-from-notion',
               );
             },
           ),

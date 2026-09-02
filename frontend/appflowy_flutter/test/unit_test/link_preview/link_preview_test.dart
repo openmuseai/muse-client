@@ -8,8 +8,8 @@ void main() async {
     () async {
       final links = [
         'https://www.baidu.com/',
-        'https://github.com/openmuseai/dsh-office/',
-        'https://github.com/openmuseai/dsh-office',
+        'https://github.com/openmuseai/openmuse/',
+        'https://github.com/openmuseai/openmuse',
         'https://github.com/',
         'https://www.figma.com/design/3K0ai4FhDOJ3Lts8G3KOVP/Page?node-id=7282-4007&p=f&t=rpfvEvh9K9J9WkIo-0',
         'https://www.figma.com/files/drafts',
@@ -24,8 +24,8 @@ void main() async {
         'baidu.com',
         'com',
         'https://www.baidu.com',
-        'https://github.com/openmuseai/dsh-office',
-        'https://github.com/openmuseai/dsh-office/app/c29fafc4-b7c0-4549-8702-71339b0fd9ea/59f36be8-9b2f-4d3e-b6a1-816c6c2043e5?blockId=GCY_T4',
+        'https://github.com/openmuseai/openmuse',
+        'https://github.com/openmuseai/openmuse/app/c29fafc4-b7c0-4549-8702-71339b0fd9ea/59f36be8-9b2f-4d3e-b6a1-816c6c2043e5?blockId=GCY_T4',
       ];
 
       final parser = DefaultParser();

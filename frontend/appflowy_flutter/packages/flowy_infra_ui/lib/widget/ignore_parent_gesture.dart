@@ -13,7 +13,7 @@ class IgnoreParentGestureWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // https://docs.flutter.dev/development/ui/advanced/gestures#gesture-disambiguation
-    // https://github.com/openmuseai/dsh-office/issues/1290
+    // https://github.com/openmuseai/openmuse/issues/1290
     return Listener(
       onPointerDown: (event) {
         onPress?.call();

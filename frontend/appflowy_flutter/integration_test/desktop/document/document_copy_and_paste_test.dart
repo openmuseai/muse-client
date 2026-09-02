@@ -43,17 +43,17 @@ void main() {
     });
 
     // ## **User Installation**
-    // - [Windows/Mac/Linux](https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/mac-windows-linux-packages)
-    // - [Docker](https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/installing-with-docker)
-    // - [Source](https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/from-source)
+    // - [Windows/Mac/Linux](https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/mac-windows-linux-packages)
+    // - [Docker](https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/installing-with-docker)
+    // - [Source](https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/from-source)
     testWidgets('paste content from html, sample 1', (tester) async {
       await tester.pasteContent(
         html:
             '''<meta charset='utf-8'><h2><strong>User Installation</strong></h2>
 <ul>
-<li><a href="https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/mac-windows-linux-packages">Windows/Mac/Linux</a></li>
-<li><a href="https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/installing-with-docker">Docker</a></li>
-<li><a href="https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/from-source">Source</a></li>
+<li><a href="https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/mac-windows-linux-packages">Windows/Mac/Linux</a></li>
+<li><a href="https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/installing-with-docker">Docker</a></li>
+<li><a href="https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/from-source">Source</a></li>
 </ul>''',
         (editorState) {
           expect(editorState.document.root.children.length, 4);
@@ -72,7 +72,7 @@ void main() {
               "insert": "Windows/Mac/Linux",
               "attributes": {
                 "href":
-                    "https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/mac-windows-linux-packages",
+                    "https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/mac-windows-linux-packages",
               },
             }
           ]);
@@ -83,7 +83,7 @@ void main() {
                 "insert": "Docker",
                 "attributes": {
                   "href":
-                      "https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/installing-with-docker",
+                      "https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/installing-with-docker",
                 },
               }
             ],
@@ -95,7 +95,7 @@ void main() {
                 "insert": "Source",
                 "attributes": {
                   "href":
-                      "https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/from-source",
+                      "https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/from-source",
                 },
               }
             ],
@@ -250,7 +250,7 @@ void main() {
       'format the selected text to href when pasting url if available',
       (tester) async {
         const text = 'appflowy';
-        const url = 'https://github.com/openmuseai/dsh-office';
+        const url = 'https://github.com/openmuseai/openmuse';
         await tester.pasteContent(
           plainText: url,
           beforeTest: (editorState) async {
@@ -277,7 +277,7 @@ void main() {
       },
     );
 
-    // https://github.com/openmuseai/dsh-office/issues/3263
+    // https://github.com/openmuseai/openmuse/issues/3263
     testWidgets(
       'paste the image from clipboard when html and image are both available',
       (tester) async {
@@ -320,7 +320,7 @@ void main() {
     testWidgets(
       'auto convert url to link preview block',
       (tester) async {
-        const url = 'https://github.com/openmuseai/dsh-office';
+        const url = 'https://github.com/openmuseai/openmuse';
         await tester.pasteContent(plainText: url, (editorState) async {
           final pasteAsMenu = find.byType(PasteAsMenu);
           expect(pasteAsMenu, findsOneWidget);
@@ -370,7 +370,7 @@ void main() {
     testWidgets(
       'ctrl/cmd+z to undo the auto convert url to link preview block',
       (tester) async {
-        const url = 'https://github.com/openmuseai/dsh-office';
+        const url = 'https://github.com/openmuseai/openmuse';
         await tester.pasteContent(plainText: url, (editorState) async {
           final pasteAsMenu = find.byType(PasteAsMenu);
           expect(pasteAsMenu, findsOneWidget);

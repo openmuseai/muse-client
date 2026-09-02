@@ -66,7 +66,7 @@ class VersionChecker {
   Future<void> checkForUpdate() async {
     if (UniversalPlatform.isLinux) {
       // open the official website in the browser
-      await afLaunchUrlString('https://github.com/openmuseai/dsh-office/download');
+      await afLaunchUrlString('https://github.com/openmuseai/openmuse/download');
     } else {
       await autoUpdater.checkForUpdates();
     }

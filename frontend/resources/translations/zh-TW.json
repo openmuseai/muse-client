@@ -1367,7 +1367,7 @@
         "memberLimitExceeded": "已達成員上限，若要邀請更多成員，請...",
         "memberLimitExceededUpgrade": "升級",
         "memberLimitExceededPro": "已達成員上限，若需要更多成員，請聯繫...",
-        "memberLimitExceededProContact": "https://github.com/openmuseai/dsh-office/issues",
+        "memberLimitExceededProContact": "https://github.com/openmuseai/openmuse/issues",
         "failedToAddMember": "新增成員失敗",
         "addMemberSuccess": "成員新增成功",
         "removeMember": "刪除成員",

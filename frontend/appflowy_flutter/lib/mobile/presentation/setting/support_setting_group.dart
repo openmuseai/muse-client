@@ -113,7 +113,7 @@ class _ReportIssuesWidget extends StatelessWidget {
           onTap: () {
             final String os = Platform.operatingSystem;
             afLaunchUrlString(
-              'https://github.com/openmuseai/dsh-office/issues/new?assignees=&labels=&projects=&template=bug_report.yaml&title=[Bug]%20Mobile:%20&version=$version&os=$os',
+              'https://github.com/openmuseai/openmuse/issues/new?assignees=&labels=&projects=&template=bug_report.yaml&title=[Bug]%20Mobile:%20&version=$version&os=$os',
             );
           },
         ),

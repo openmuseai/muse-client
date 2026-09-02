@@ -135,7 +135,7 @@ class HomePageSettingsPopupMenu extends StatelessWidget {
   }
 
   void _openHelpAndDocumentationPage(BuildContext context) {
-    afLaunchUrlString('https://github.com/openmuseai/dsh-office/guide');
+    afLaunchUrlString('https://github.com/openmuseai/openmuse/guide');
   }
 }
 

@@ -19,7 +19,7 @@ _Additionally, we are working on a Web version built with Tauri!_
 
 ### Am I Eligible to Contribute?
 
-Yes! You are eligible to contribute, check out the ways in which you can [contribute to AppFlowy](https://github.com/openmuseai/dsh-office/docs/documentation/software-contributions/contributing-to-appflowy). Some of the ways in which you can contribute are:
+Yes! You are eligible to contribute, check out the ways in which you can [contribute to AppFlowy](https://github.com/openmuseai/openmuse/docs/documentation/software-contributions/contributing-to-appflowy). Some of the ways in which you can contribute are:
 
 - Non-Coding Contributions
   - Documentation
@@ -32,19 +32,19 @@ To contribute to `AppFlowy_Flutter` codebase specifically (coding contribution) 
 
 ### What OS should I use for development?
 
-We support all OS for Development i.e. Linux, MacOS and Windows. However, most of us promote macOS and Linux over Windows. We have detailed [docs](https://github.com/openmuseai/dsh-office/docs/documentation/appflowy/from-source/environment-setup) on how to setup `AppFlowy_Flutter` on your local system respectively per operating system.
+We support all OS for Development i.e. Linux, MacOS and Windows. However, most of us promote macOS and Linux over Windows. We have detailed [docs](https://github.com/openmuseai/openmuse/docs/documentation/appflowy/from-source/environment-setup) on how to setup `AppFlowy_Flutter` on your local system respectively per operating system.
 
 ### Getting Started ❇
 
-We have detailed documentation on how to [get started](https://github.com/openmuseai/dsh-office/docs/documentation/software-contributions/contributing-to-appflowy) with the project, and make your first contribution. However, we do have some specific picks for you:
+We have detailed documentation on how to [get started](https://github.com/openmuseai/openmuse/docs/documentation/software-contributions/contributing-to-appflowy) with the project, and make your first contribution. However, we do have some specific picks for you:
 
-- [Code Architecture](https://github.com/openmuseai/dsh-office/docs/essential-documentation/contribute-to-appflowy/architecture/frontend/frontend/codemap)
-- [Styleguide & Conventions](https://github.com/openmuseai/dsh-office/docs/documentation/software-contributions/conventions/naming-conventions)
-- [Making Your First PR](https://github.com/openmuseai/dsh-office/docs/documentation/software-contributions/submitting-code/submitting-your-first-pull-request)
-- [All AppFlowy Documentation](https://github.com/openmuseai/dsh-office/docs/documentation/appflowy) - Contribution guide, build and run, debugging, testing, localization, etc.
+- [Code Architecture](https://github.com/openmuseai/openmuse/docs/essential-documentation/contribute-to-appflowy/architecture/frontend/frontend/codemap)
+- [Styleguide & Conventions](https://github.com/openmuseai/openmuse/docs/documentation/software-contributions/conventions/naming-conventions)
+- [Making Your First PR](https://github.com/openmuseai/openmuse/docs/documentation/software-contributions/submitting-code/submitting-your-first-pull-request)
+- [All AppFlowy Documentation](https://github.com/openmuseai/openmuse/docs/documentation/appflowy) - Contribution guide, build and run, debugging, testing, localization, etc.
 
 ### Need Help?
 
-- New to GitHub? Follow [these](https://github.com/openmuseai/dsh-office/docs/documentation/software-contributions/submitting-code/setting-up-your-repositories) steps to get started
+- New to GitHub? Follow [these](https://github.com/openmuseai/openmuse/docs/documentation/software-contributions/submitting-code/setting-up-your-repositories) steps to get started
 - Stuck Somewhere? Join our [Discord](https://discord.gg/9Q2xaN37tV), we're there to help you!
-- Find out more about the [community initiatives](https://github.com/openmuseai/dsh-office/docs/appflowy/community).
+- Find out more about the [community initiatives](https://github.com/openmuseai/openmuse/docs/appflowy/community).

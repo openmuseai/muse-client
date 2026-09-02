@@ -56,7 +56,7 @@ void main() {
 
       // Change cover to a network image
       const imageUrl =
-          "https://raw.githubusercontent.com/openmuseai/dsh-office/main/frontend/client/frontend/appflowy_flutter/assets/images/dsh_office_logo.png";
+          "https://raw.githubusercontent.com/openmuseai/openmuse/main/frontend/client/frontend/appflowy_flutter/assets/images/dsh_office_logo.png";
       await tester.editor.hoverOnCover();
       await tester.editor.tapOnChangeCover();
       await tester.editor.addNetworkImageCover(imageUrl);

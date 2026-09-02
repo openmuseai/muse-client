@@ -32,7 +32,7 @@ class SignInAgreement extends StatelessWidget {
             style: underlinedTextStyle,
             mouseCursor: SystemMouseCursors.click,
             recognizer: TapGestureRecognizer()
-              ..onTap = () => afLaunchUrlString('https://github.com/openmuseai/dsh-office/terms'),
+              ..onTap = () => afLaunchUrlString('https://github.com/openmuseai/openmuse/terms'),
           ),
           TextSpan(
             text: '${LocaleKeys.web_and.tr()} ',
@@ -43,7 +43,7 @@ class SignInAgreement extends StatelessWidget {
             style: underlinedTextStyle,
             mouseCursor: SystemMouseCursors.click,
             recognizer: TapGestureRecognizer()
-              ..onTap = () => afLaunchUrlString('https://github.com/openmuseai/dsh-office/privacy'),
+              ..onTap = () => afLaunchUrlString('https://github.com/openmuseai/openmuse/privacy'),
           ),
         ],
       ),

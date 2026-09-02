@@ -18,7 +18,7 @@ class AutoUpdateTask extends LaunchTask {
   AutoUpdateTask();
 
   static const _feedUrl =
-      'https://github.com/openmuseai/dsh-office/releases/latest/download/appcast-{os}-{arch}.xml';
+      'https://github.com/openmuseai/openmuse/releases/latest/download/appcast-{os}-{arch}.xml';
   final _listener = _AppFlowyAutoUpdaterListener();
 
   @override

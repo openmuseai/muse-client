@@ -1338,7 +1338,7 @@
         "memberLimitExceeded": "Достигнут лимит участников, чтобы пригласить больше, пожалуйста,",
         "memberLimitExceededUpgrade": "обновитесь",
         "memberLimitExceededPro": "Достигнут лимит участников, если вам нужно больше участников, свяжитесь с",
-        "memberLimitExceededProContact": "https://github.com/openmuseai/dsh-office/issues",
+        "memberLimitExceededProContact": "https://github.com/openmuseai/openmuse/issues",
         "failedToAddMember": "Не удалось добавить участника",
         "addMemberSuccess": "Участник успешно добавлен",
         "removeMember": "Удалить участника",

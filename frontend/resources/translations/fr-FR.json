@@ -1379,7 +1379,7 @@
         "memberLimitExceeded": "Vous avez atteint la limite maximale de membres autorisée pour votre compte. Si vous souhaitez ajouter d'autres membres pour continuer votre travail, veuillez en faire la demande sur Github.",
         "memberLimitExceededUpgrade": "mise à niveau",
         "memberLimitExceededPro": "Limite de membres atteinte, si vous avez besoin de plus de membres, contactez ",
-        "memberLimitExceededProContact": "https://github.com/openmuseai/dsh-office/issues",
+        "memberLimitExceededProContact": "https://github.com/openmuseai/openmuse/issues",
         "failedToAddMember": "Échec de l'ajout d'un membre",
         "addMemberSuccess": "Membre ajouté avec succès",
         "removeMember": "Supprimer un membre",

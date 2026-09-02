@@ -121,32 +121,32 @@ class _BubbleActionListState extends State<BubbleActionList> {
         if (action is BubbleActionWrapper) {
           switch (action.inner) {
             case BubbleAction.whatsNews:
-              afLaunchUrlString('https://github.com/openmuseai/dsh-office/releases');
+              afLaunchUrlString('https://github.com/openmuseai/openmuse/releases');
               break;
             case BubbleAction.getSupport:
-              afLaunchUrlString('https://github.com/openmuseai/dsh-office/discussions');
+              afLaunchUrlString('https://github.com/openmuseai/openmuse/discussions');
               break;
             case BubbleAction.debug:
               _DebugToast().show();
               break;
             case BubbleAction.shortcuts:
               afLaunchUrlString(
-                'https://github.com/openmuseai/dsh-office/docs/appflowy/product/shortcuts',
+                'https://github.com/openmuseai/openmuse/docs/appflowy/product/shortcuts',
               );
               break;
             case BubbleAction.markdown:
               afLaunchUrlString(
-                'https://github.com/openmuseai/dsh-office/docs/appflowy/product/markdown',
+                'https://github.com/openmuseai/openmuse/docs/appflowy/product/markdown',
               );
               break;
             case BubbleAction.github:
               afLaunchUrlString(
-                'https://github.com/openmuseai/dsh-office/issues/new/choose',
+                'https://github.com/openmuseai/openmuse/issues/new/choose',
               );
               break;
             case BubbleAction.helpAndDocumentation:
               afLaunchUrlString(
-                'https://github.com/openmuseai/dsh-office/guide',
+                'https://github.com/openmuseai/openmuse/guide',
               );
               break;
           }

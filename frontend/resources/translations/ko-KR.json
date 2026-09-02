@@ -1305,7 +1305,7 @@
         "memberLimitExceeded": "멤버 한도에 도달했습니다. 더 많은 멤버를 초대하려면 ",
         "memberLimitExceededUpgrade": "업그레이드",
         "memberLimitExceededPro": "멤버 한도에 도달했습니다. 더 많은 멤버가 필요하면 ",
-        "memberLimitExceededProContact": "https://github.com/openmuseai/dsh-office/issues에 문의하세요",
+        "memberLimitExceededProContact": "https://github.com/openmuseai/openmuse/issues에 문의하세요",
         "failedToAddMember": "멤버 추가 실패",
         "addMemberSuccess": "멤버가 성공적으로 추가되었습니다",
         "removeMember": "멤버 제거",

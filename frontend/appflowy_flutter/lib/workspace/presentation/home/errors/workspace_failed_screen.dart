@@ -53,7 +53,7 @@ class _WorkspaceFailedScreenState extends State<WorkspaceFailedScreen> {
                             LocaleKeys.workspace_errorActions_reportIssue.tr(),
                         height: 40,
                         onPressed: () => afLaunchUrlString(
-                          'https://github.com/openmuseai/dsh-office/issues/new?assignees=&labels=&projects=&template=bug_report.yaml&title=[Bug]%20Workspace%20failed%20to%20load&version=$version&os=$os',
+                          'https://github.com/openmuseai/openmuse/issues/new?assignees=&labels=&projects=&template=bug_report.yaml&title=[Bug]%20Workspace%20failed%20to%20load&version=$version&os=$os',
                         ),
                       ),
                     ),

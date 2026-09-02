@@ -5,12 +5,12 @@ set -e
 usage() {
   this=$1
   cat <<EOF
-$this: download latest archive file for openmuseai/dsh-office
+$this: download latest archive file for openmuseai/muse-client
 Usage: $this [-b] bindir [-d] [tag]
   -b sets bindir or installation directory, Defaults to /opt
   -d turns on debug logging
    [tag] is a tag from
-   https://github.com/openmuseai/dsh-office/releases
+   https://github.com/openmuseai/muse-client/releases
    If tag is missing, then the latest will be used.
 EOF
   exit 2

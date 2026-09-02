@@ -25,14 +25,14 @@ class AboutSettingGroup extends StatelessWidget {
           trailing: MobileSettingTrailing(
             text: '',
           ),
-          onTap: () => afLaunchUrlString('https://github.com/openmuseai/dsh-office/privacy'),
+          onTap: () => afLaunchUrlString('https://github.com/openmuseai/openmuse/privacy'),
         ),
         MobileSettingItem(
           name: LocaleKeys.settings_mobile_termsAndConditions.tr(),
           trailing: MobileSettingTrailing(
             text: '',
           ),
-          onTap: () => afLaunchUrlString('https://github.com/openmuseai/dsh-office/terms'),
+          onTap: () => afLaunchUrlString('https://github.com/openmuseai/openmuse/terms'),
         ),
         if (kDebugMode)
           MobileSettingItem(

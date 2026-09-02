@@ -21,8 +21,8 @@ abstract class IUserBackendService {
   );
 }
 
-const _baseBetaUrl = 'https://github.com/openmuseai/dsh-office';
-const _baseProdUrl = 'https://github.com/openmuseai/dsh-office';
+const _baseBetaUrl = 'https://github.com/openmuseai/openmuse';
+const _baseProdUrl = 'https://github.com/openmuseai/openmuse';
 
 class UserBackendService implements IUserBackendService {
   UserBackendService({required this.userId});

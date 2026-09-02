@@ -124,7 +124,7 @@
           { "insert": "Keyboard shortcuts " },
           {
             "attributes": {
-              "href": "https://github.com/openmuseai/dsh-office/docs/essential-documentation/shortcuts"
+              "href": "https://github.com/openmuseai/openmuse/docs/essential-documentation/shortcuts"
             },
             "insert": "guide"
           }
@@ -138,7 +138,7 @@
           { "insert": "Markdown " },
           {
             "attributes": {
-              "href": "https://github.com/openmuseai/dsh-office/docs/essential-documentation/markdown"
+              "href": "https://github.com/openmuseai/openmuse/docs/essential-documentation/markdown"
             },
             "insert": "reference"
           }
@@ -192,7 +192,7 @@
           { "insert": "\nLike DSH Office? Follow us:\n" },
           {
             "attributes": {
-              "href": "https://github.com/openmuseai/dsh-office"
+              "href": "https://github.com/openmuseai/openmuse"
             },
             "insert": "GitHub"
           },

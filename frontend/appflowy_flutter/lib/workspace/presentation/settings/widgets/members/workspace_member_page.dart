@@ -147,7 +147,7 @@ class WorkspaceMembersPage extends StatelessWidget {
   //                           // Hardcoded support email, in the future we might
   //                           // want to add this to an environment variable
   //                           onTap: () async => afLaunchUrlString(
-  //                             'https://github.com/openmuseai/dsh-office/issues',
+  //                             'https://github.com/openmuseai/openmuse/issues',
   //                           ),
   //                           child: FlowyText(
   //                             LocaleKeys

@@ -138,7 +138,7 @@ class _DesktopSyncErrorPage extends StatelessWidget {
                   recognizer: TapGestureRecognizer()
                     ..onTap = () {
                       afLaunchUrlString(
-                        'https://github.com/openmuseai/dsh-office/issues/new?template=bug_report.yaml',
+                        'https://github.com/openmuseai/openmuse/issues/new?template=bug_report.yaml',
                       );
                     },
                 ),

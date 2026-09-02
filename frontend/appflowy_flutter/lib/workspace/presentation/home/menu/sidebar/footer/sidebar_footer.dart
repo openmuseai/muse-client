@@ -60,7 +60,7 @@ class SidebarTemplateButton extends StatelessWidget {
         FlowySvgs.icon_template_s,
       ),
       text: LocaleKeys.template_label.tr(),
-      onTap: () => afLaunchUrlString('https://github.com/openmuseai/dsh-office/templates'),
+      onTap: () => afLaunchUrlString('https://github.com/openmuseai/openmuse/templates'),
     );
   }
 }

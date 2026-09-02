@@ -37,5 +37,5 @@ To run this example:
 For more information about the AppFlowy UI package, please refer to:
 
 - The main package documentation
-- [AppFlowy Website](https://github.com/openmuseai/dsh-office)
-- [AppFlowy GitHub Repository](https://github.com/openmuseai/dsh-office)
+- [AppFlowy Website](https://github.com/openmuseai/openmuse)
+- [AppFlowy GitHub Repository](https://github.com/openmuseai/openmuse)

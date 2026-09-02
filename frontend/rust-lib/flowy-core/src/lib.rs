@@ -106,7 +106,7 @@ impl AppFlowyCore {
     #[allow(clippy::if_same_then_else)]
     if cfg!(debug_assertions) {
       /// The profiling can be used to tracing the performance of the application.
-      /// Check out the [Link](https://github.com/openmuseai/dsh-office/docs/documentation/software-contributions/architecture/backend/profiling#enable-profiling)
+      /// Check out the [Link](https://github.com/openmuseai/openmuse/docs/documentation/software-contributions/architecture/backend/profiling#enable-profiling)
       ///  for more information.
       #[cfg(feature = "profiling")]
       console_subscriber::init();

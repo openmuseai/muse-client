@@ -24,7 +24,7 @@ class WebUrlHintWidget extends StatelessWidget {
           ),
           onPressed: () {
             afLaunchUrlString(
-              'https://github.com/openmuseai/dsh-office/docs/self-host-appflowy-run-appflowy-web',
+              'https://github.com/openmuseai/openmuse/docs/self-host-appflowy-run-appflowy-web',
             );
           },
         ),

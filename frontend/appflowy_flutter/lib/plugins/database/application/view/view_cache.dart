@@ -33,7 +33,7 @@ class DatabaseViewCallbacks {
   final OnRowsDeleted? onRowsDeleted;
 }
 
-/// Read https://github.com/openmuseai/dsh-office/docs/documentation/software-contributions/architecture/frontend/frontend/grid for more information
+/// Read https://github.com/openmuseai/openmuse/docs/documentation/software-contributions/architecture/frontend/frontend/grid for more information
 class DatabaseViewCache {
   DatabaseViewCache({
     required this.viewId,

@@ -224,7 +224,7 @@ class GitHubRedirectButton extends StatelessWidget {
   Uri get _gitHubNewBugUri => Uri(
         scheme: 'https',
         host: 'github.com',
-        path: '/openmuseai/dsh-office/issues/new',
+        path: '/openmuseai/openmuse/issues/new',
         query:
             'assignees=&labels=&projects=&template=bug_report.yaml&os=$_platform&title=%5BBug%5D+$title&context=$_contextString',
       );

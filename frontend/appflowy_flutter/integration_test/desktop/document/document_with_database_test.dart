@@ -34,7 +34,7 @@ void main() {
         findsOneWidget,
       );
 
-      // https://github.com/openmuseai/dsh-office/issues/3533
+      // https://github.com/openmuseai/openmuse/issues/3533
       // test: the selection of editor should be clear when editing the grid
       await tester.editor.updateSelection(
         Selection.collapsed(
@@ -194,7 +194,7 @@ void main() {
         findsOneWidget,
       );
 
-      // https://github.com/openmuseai/dsh-office/issues/3533
+      // https://github.com/openmuseai/openmuse/issues/3533
       // test: the selection of editor should be clear when editing the grid
       await tester.editor.updateSelection(
         Selection.collapsed(

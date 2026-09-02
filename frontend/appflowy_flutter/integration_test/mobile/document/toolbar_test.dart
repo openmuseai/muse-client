@@ -23,7 +23,7 @@ void main() {
     expect(editor, findsOneWidget);
   }
 
-  const testLink = 'https://github.com/openmuseai/dsh-office/';
+  const testLink = 'https://github.com/openmuseai/openmuse/';
 
   group('links', () {
     testWidgets('insert links', (tester) async {

@@ -37,7 +37,7 @@ class TextFieldPage extends StatelessWidget {
             'TextField with initial text',
             [
               AFTextField(
-                initialText: 'https://github.com/openmuseai/dsh-office',
+                initialText: 'https://github.com/openmuseai/openmuse',
               ),
             ],
           ),

@@ -8,4 +8,4 @@ docker-compose build --build-arg uid=$(id -u) --build-arg gid=$(id -g)
 
 For more information, check out our documentation:
 
-https://github.com/openmuseai/dsh-office/docs/essential-documentation/install-appflowy/installation-methods/installing-with-docker
+https://github.com/openmuseai/openmuse/docs/essential-documentation/install-appflowy/installation-methods/installing-with-docker

@@ -124,7 +124,7 @@ class _UpdateAppSection extends StatelessWidget {
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             onTap: () {
-              afLaunchUrlString('https://github.com/openmuseai/dsh-office/releases');
+              afLaunchUrlString('https://github.com/openmuseai/openmuse/releases');
             },
             child: FlowyText.regular(
               LocaleKeys.autoUpdate_settingsUpdateWhatsNew.tr(),

@@ -913,7 +913,7 @@ Bug Fixes
 
 ## Version 0.4.2 - 01/15/2024
 AppFlowy for Android is available to download on GitHub.
-If you’ve been using our desktop app, it’s important to read [this guide](https://github.com/openmuseai/dsh-office/docs/guides/sync-desktop-and-mobile) before logging into the mobile app.
+If you’ve been using our desktop app, it’s important to read [this guide](https://github.com/openmuseai/openmuse/docs/guides/sync-desktop-and-mobile) before logging into the mobile app.
 ### New Features
 - Enhanced RTL (Right-to-Left) support for mobile platforms.
 - Optimized selection gesture system on mobile.
@@ -932,7 +932,7 @@ If you’ve been using our desktop app, it’s important to read [this guide](ht
 - Fix import AppFlowy data folder
 
 ## Version 0.4.0 - 12/30/2023
-1. Added capability to import data from an AppFlowy data folder. For detailed information, please see [AppFlowy Data Storage Documentation](https://github.com/openmuseai/dsh-office/docs/appflowy/product/data-storage).
+1. Added capability to import data from an AppFlowy data folder. For detailed information, please see [AppFlowy Data Storage Documentation](https://github.com/openmuseai/openmuse/docs/appflowy/product/data-storage).
 2. Enhanced user interface and fixed various bugs.
 3. Improved the efficiency of data synchronization in AppFlowy Cloud
 
@@ -1121,7 +1121,7 @@ If you’ve been using our desktop app, it’s important to read [this guide](ht
 
 ### New Features
 
-<img width="1147" src="https://github.com/openmuseai/dsh-office/assets/11863087/ac464740-c685-4a85-ae99-1074c1c607e5">
+<img width="1147" src="https://github.com/openmuseai/openmuse/assets/11863087/ac464740-c685-4a85-ae99-1074c1c607e5">
 
 - Open page in new tab
 - Create toggle lists to keep things tidy in your pages
@@ -1231,11 +1231,11 @@ The data format of this version is not compatible with previous versions. Theref
 
 #### Export files in v0.1.6
 
-https://github.com/openmuseai/dsh-office/assets/11863087/0c89bf2b-cd97-4a7b-b627-59df8d2967d9
+https://github.com/openmuseai/openmuse/assets/11863087/0c89bf2b-cd97-4a7b-b627-59df8d2967d9
 
 #### Import files in v0.2.0
 
-https://github.com/openmuseai/dsh-office/assets/11863087/7b392f35-4972-497a-8a7f-f38efced32e2
+https://github.com/openmuseai/openmuse/assets/11863087/7b392f35-4972-497a-8a7f-f38efced32e2
 
 ## Version 0.1.5 - 11/05/2023
 

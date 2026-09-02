@@ -42,7 +42,7 @@ void main() {
       expect(find.text('Add your link', findRichText: true), findsOneWidget);
 
       // input the link
-      const url = 'https://github.com/openmuseai/dsh-office';
+      const url = 'https://github.com/openmuseai/openmuse';
       final textField = find.byWidgetPredicate(
         (widget) => widget is TextField && widget.decoration!.hintText == 'URL',
       );

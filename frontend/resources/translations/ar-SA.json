@@ -1378,7 +1378,7 @@
         "memberLimitExceeded": "تم الوصول إلى الحد الأقصى للأعضاء، لدعوة المزيد من الأعضاء، يرجى ",
         "memberLimitExceededUpgrade": "ترقية",
         "memberLimitExceededPro": "تم الوصول إلى الحد الأقصى للأعضاء، إذا كنت بحاجة إلى المزيد من الأعضاء، فاتصل بنا ",
-        "memberLimitExceededProContact": "https://github.com/openmuseai/dsh-office/issues",
+        "memberLimitExceededProContact": "https://github.com/openmuseai/openmuse/issues",
         "failedToAddMember": "فشل في إضافة العضو",
         "addMemberSuccess": "تمت إضافة العضو بنجاح",
         "removeMember": "إزالة العضو",

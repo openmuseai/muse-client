@@ -1318,7 +1318,7 @@
     "memberLimitExceeded": "सदस्य मर्यादा गाठली आहे, अधिक सदस्य आमंत्रित करण्यासाठी कृपया ",
     "memberLimitExceededUpgrade": "अपग्रेड करा",
     "memberLimitExceededPro": "सदस्य मर्यादा गाठली आहे, अधिक सदस्य आवश्यक असल्यास संपर्क करा",
-    "memberLimitExceededProContact": "https://github.com/openmuseai/dsh-office/issues",
+    "memberLimitExceededProContact": "https://github.com/openmuseai/openmuse/issues",
     "failedToAddMember": "सदस्य जोडण्यात अयशस्वी",
     "addMemberSuccess": "सदस्य यशस्वीरित्या जोडला गेला",
     "removeMember": "सदस्य काढा",

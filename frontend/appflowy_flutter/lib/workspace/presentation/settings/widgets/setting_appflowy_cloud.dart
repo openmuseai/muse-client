@@ -240,7 +240,7 @@ class AppFlowySelfHostTip extends StatelessWidget {
   const AppFlowySelfHostTip({super.key});
 
   final url =
-      "https://github.com/openmuseai/dsh-office/docs/guides/appflowy/self-hosting-appflowy#build-appflowy-with-a-self-hosted-server";
+      "https://github.com/openmuseai/openmuse/docs/guides/appflowy/self-hosting-appflowy#build-appflowy-with-a-self-hosted-server";
 
   @override
   Widget build(BuildContext context) {

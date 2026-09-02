@@ -26,9 +26,9 @@ class SocialMediaSection extends CustomActionCell {
             itemHeight: ActionListSizes.itemHeight,
             onSelected: (action) {
               final url = switch (action.inner) {
-                SocialMedia.reddit => 'https://github.com/openmuseai/dsh-office/discussions',
-                SocialMedia.twitter => 'https://github.com/openmuseai/dsh-office',
-                SocialMedia.forum => 'https://github.com/openmuseai/dsh-office/discussions',
+                SocialMedia.reddit => 'https://github.com/openmuseai/openmuse/discussions',
+                SocialMedia.twitter => 'https://github.com/openmuseai/openmuse',
+                SocialMedia.forum => 'https://github.com/openmuseai/openmuse/discussions',
               };
 
               afLaunchUrlString(url);

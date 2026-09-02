@@ -1280,7 +1280,7 @@
         "memberLimitExceeded": "Üye sınırına ulaşıldı, daha fazla üye davet etmek için lütfen ",
         "memberLimitExceededUpgrade": "yükseltin",
         "memberLimitExceededPro": "Üye sınırına ulaşıldı, daha fazla üye gerekiyorsa ",
-        "memberLimitExceededProContact": "https://github.com/openmuseai/dsh-office/issues",
+        "memberLimitExceededProContact": "https://github.com/openmuseai/openmuse/issues",
         "failedToAddMember": "Üye eklenemedi",
         "addMemberSuccess": "Üye başarıyla eklendi",
         "removeMember": "Üyeyi Kaldır",

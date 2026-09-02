@@ -13,7 +13,7 @@ class ThemeUploadLearnMoreButton extends StatelessWidget {
   const ThemeUploadLearnMoreButton({super.key});
 
   static const learnMoreURL =
-      'https://github.com/openmuseai/dsh-office/docs/appflowy/product/themes';
+      'https://github.com/openmuseai/openmuse/docs/appflowy/product/themes';
 
   @override
   Widget build(BuildContext context) {

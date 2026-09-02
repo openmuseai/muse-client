@@ -27,7 +27,7 @@ import '../../shared/util.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  const avaliableLink = 'https://github.com/openmuseai/dsh-office/',
+  const avaliableLink = 'https://github.com/openmuseai/openmuse/',
       unavailableLink = 'www.thereIsNoting.com';
 
   Future<void> preparePage(WidgetTester tester, {String? pageName}) async {

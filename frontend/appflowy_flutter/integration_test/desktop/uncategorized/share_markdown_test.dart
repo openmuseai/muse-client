@@ -131,8 +131,8 @@ const expectedMarkdown = '''
 ---
 
 ## Keyboard shortcuts, markdown, and code block
-1. Keyboard shortcuts [guide](https://github.com/openmuseai/dsh-office/docs/essential-documentation/shortcuts)
-1. Markdown [reference](https://github.com/openmuseai/dsh-office/docs/essential-documentation/markdown)
+1. Keyboard shortcuts [guide](https://github.com/openmuseai/openmuse/docs/essential-documentation/shortcuts)
+1. Markdown [reference](https://github.com/openmuseai/openmuse/docs/essential-documentation/markdown)
 1. Type `/code` to insert a code block
 ```rust
 // This is the main function.
@@ -148,7 +148,7 @@ fn main() {
 > 🥰
 > 
 > Like AppFlowy? Follow us:
-> [GitHub](https://github.com/openmuseai/dsh-office)
+> [GitHub](https://github.com/openmuseai/openmuse)
 > [Twitter](https://twitter.com/appflowy): @appflowy
 > [Newsletter](https://blog-appflowy.ghost.io/)
 > 

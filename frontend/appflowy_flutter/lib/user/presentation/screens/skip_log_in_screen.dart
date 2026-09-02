@@ -143,7 +143,7 @@ class SubscribeButtons extends StatelessWidget {
               hoverColor: Colors.transparent,
               fillColor: Colors.transparent,
               onPressed: () =>
-                  afLaunchUrlString('https://github.com/openmuseai/dsh-office'),
+                  afLaunchUrlString('https://github.com/openmuseai/openmuse'),
             ),
           ],
         ),
@@ -160,7 +160,7 @@ class SubscribeButtons extends StatelessWidget {
               hoverColor: Colors.transparent,
               fillColor: Colors.transparent,
               onPressed: () =>
-                  afLaunchUrlString('https://github.com/openmuseai/dsh-office/discussions'),
+                  afLaunchUrlString('https://github.com/openmuseai/openmuse/discussions'),
             ),
           ],
         ),

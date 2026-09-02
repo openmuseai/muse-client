@@ -517,5 +517,5 @@ jobs:
     steps:
       - name: Notify Discord
         run: |
-          curl -H "Content-Type: application/json" -d '{"username": "release@dsh-office", "content": "🎉 DSH Office ${{ github.ref_name }} is available. https://github.com/openmuseai/dsh-office/releases/tag/'${{ github.ref_name }}'"}' "https://discord.com/api/webhooks/${{ secrets.DISCORD }}"
+          curl -H "Content-Type: application/json" -d '{"username": "release@dsh-office", "content": "🎉 DSH Office ${{ github.ref_name }} is available. https://github.com/openmuseai/muse-client/releases/tag/'${{ github.ref_name }}'"}' "https://discord.com/api/webhooks/${{ secrets.DISCORD }}"
         shell: bash

@@ -3,7 +3,7 @@ import 'package:appflowy/startup/startup.dart';
 
 class ShareConstants {
   static const String testBaseWebDomain = 'test.dsh-office.dev';
-  static const String defaultBaseWebDomain = 'https://github.com/openmuseai/dsh-office';
+  static const String defaultBaseWebDomain = 'https://github.com/openmuseai/openmuse';
 
   static String buildPublishUrl({
     required String nameSpace,

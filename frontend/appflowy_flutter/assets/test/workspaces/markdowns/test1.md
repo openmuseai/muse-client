@@ -13,8 +13,8 @@
 
 ## Keyboard shortcuts, markdown, and code block
 
-1. Keyboard shortcuts [guide](https://github.com/openmuseai/dsh-office/docs/essential-documentation/shortcuts)
-1. Markdown [reference](https://github.com/openmuseai/dsh-office/docs/essential-documentation/markdown)
+1. Keyboard shortcuts [guide](https://github.com/openmuseai/openmuse/docs/essential-documentation/shortcuts)
+1. Markdown [reference](https://github.com/openmuseai/openmuse/docs/essential-documentation/markdown)
 1. Type `/code` to insert a code block
 
 ## Have a question❓

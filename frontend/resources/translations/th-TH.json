@@ -1231,7 +1231,7 @@
         "memberLimitExceeded": "จำนวนสมาชิกถึงขีดจำกัดแล้ว เพื่อเชิญสมาชิกเพิ่มเติม กรุณา...",
         "memberLimitExceededUpgrade": "อัพเกรด",
         "memberLimitExceededPro": "จำนวนสมาชิกถึงขีดจำกัดแล้ว หากต้องการสมาชิกเพิ่มเติม กรุณาติดต่อ ",
-        "memberLimitExceededProContact": "https://github.com/openmuseai/dsh-office/issues",
+        "memberLimitExceededProContact": "https://github.com/openmuseai/openmuse/issues",
         "failedToAddMember": "เพิ่มสมาชิกไม่สำเร็จ",
         "addMemberSuccess": "เพิ่มสมาชิกสำเร็จ",
         "removeMember": "ลบสมาชิก",

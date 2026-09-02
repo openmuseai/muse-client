@@ -9,12 +9,12 @@ Desktop (Windows · macOS) and mobile (Android · iOS). **Local mode only**: no 
 
 - **Stack**: Flutter (UI) + Rust (core), local FFI
 - **License**: AGPL-3.0 (derived from [AppFlowy-IO/AppFlowy](https://github.com/AppFlowy-IO/AppFlowy); see [NOTICE](../../NOTICE))
-- **Repository**: [github.com/openmuseai/dsh-office](https://github.com/openmuseai/dsh-office)
+- **Repository**: [github.com/openmuseai/openmuse](https://github.com/openmuseai/openmuse)
 
 <p align="center">
-    <a href="https://github.com/openmuseai/dsh-office/releases"><b>Releases</b></a> •
-    <a href="https://github.com/openmuseai/dsh-office/discussions"><b>Discussions</b></a> •
-    <a href="https://github.com/openmuseai/dsh-office/issues"><b>Issues</b></a>
+    <a href="https://github.com/openmuseai/openmuse/releases"><b>Releases</b></a> •
+    <a href="https://github.com/openmuseai/openmuse/discussions"><b>Discussions</b></a> •
+    <a href="https://github.com/openmuseai/openmuse/issues"><b>Issues</b></a>
 </p>
 
 ## Layout
@@ -49,7 +49,7 @@ The DSH sidecar used by the app is built from `middlewares/` (`./middlewares/scr
 
 ## Install
 
-- GitHub [Releases](https://github.com/openmuseai/dsh-office/releases)
+- GitHub [Releases](https://github.com/openmuseai/openmuse/releases)
 - macOS: `DSH Office.app`
 - Windows: inno installer when published
 - Android / iOS: packages from Releases or local `dist/`

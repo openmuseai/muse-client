@@ -243,7 +243,7 @@ class _LackOfResource extends StatelessWidget {
             recognizer: TapGestureRecognizer()
               ..onTap = () {
                 afLaunchUrlString(
-                  "https://github.com/openmuseai/dsh-office/guide/appflowy-local-ai-ollama",
+                  "https://github.com/openmuseai/openmuse/guide/appflowy-local-ai-ollama",
                 );
               },
           ),
@@ -279,7 +279,7 @@ class _LackOfResource extends StatelessWidget {
         recognizer: TapGestureRecognizer()
           ..onTap = () {
             afLaunchUrlString(
-              "https://github.com/openmuseai/dsh-office/guide/appflowy-local-ai-ollama",
+              "https://github.com/openmuseai/openmuse/guide/appflowy-local-ai-ollama",
             );
           },
       ),

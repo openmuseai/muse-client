@@ -74,7 +74,7 @@ pub enum MediaFileTypePB {
   Other = 0,
   // Eg. jpg, png, gif, etc.
   Image = 1,
-  // Eg. https://github.com/openmuseai/dsh-office
+  // Eg. https://github.com/openmuseai/openmuse
   Link = 2,
   // Eg. pdf, doc, etc.
   Document = 3,

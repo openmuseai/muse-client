@@ -1,6 +1,6 @@
 # AppFlowy 项目分析文档
 
-本目录包含对 **AppFlowy** 客户端仓库（`openmuseai/dsh-office`）的架构与功能分析，基于当前工作区源码（版本 `0.11.4`）整理。
+本目录包含对 **AppFlowy** 客户端仓库（`openmuseai/openmuse`）的架构与功能分析，基于当前工作区源码（版本 `0.11.4`）整理。
 
 ## 文档索引
 

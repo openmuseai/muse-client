@@ -170,7 +170,7 @@ pub fn make_test_board() -> DatabaseData {
             FieldType::MultiSelect => row_builder
               .insert_multi_select_cell(|mut options| vec![options.remove(0), options.remove(0)]),
             FieldType::Checkbox => row_builder.insert_checkbox_cell("true"),
-            FieldType::URL => row_builder.insert_url_cell("https://github.com/openmuseai/dsh-office"),
+            FieldType::URL => row_builder.insert_url_cell("https://github.com/openmuseai/openmuse"),
             _ => "".to_owned(),
           };
         }
@@ -207,7 +207,7 @@ pub fn make_test_board() -> DatabaseData {
             },
             FieldType::Checkbox => row_builder.insert_checkbox_cell("false"),
             FieldType::URL => {
-              row_builder.insert_url_cell("https://github.com/openmuseai/dsh-office")
+              row_builder.insert_url_cell("https://github.com/openmuseai/openmuse")
             },
             _ => "".to_owned(),
           };
@@ -223,7 +223,7 @@ pub fn make_test_board() -> DatabaseData {
               row_builder.insert_single_select_cell(|mut options| options.remove(1))
             },
             FieldType::Checkbox => row_builder.insert_checkbox_cell("false"),
-            FieldType::URL => row_builder.insert_url_cell("https://github.com/openmuseai/dsh-office"),
+            FieldType::URL => row_builder.insert_url_cell("https://github.com/openmuseai/openmuse"),
             _ => "".to_owned(),
           };
         }

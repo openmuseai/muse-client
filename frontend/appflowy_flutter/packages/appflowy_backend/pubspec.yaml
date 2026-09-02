@@ -1,7 +1,7 @@
 name: appflowy_backend
 description: A new flutter plugin project.
 version: 0.0.1
-homepage: https://github.com/openmuseai/dsh-office
+homepage: https://github.com/openmuseai/openmuse
 publish_to: "none"
 
 environment:

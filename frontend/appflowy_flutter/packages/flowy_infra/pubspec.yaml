@@ -1,7 +1,7 @@
 name: flowy_infra
 description: AppFlowy Infra.
 version: 0.0.1
-homepage: https://github.com/openmuseai/dsh-office
+homepage: https://github.com/openmuseai/openmuse
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
