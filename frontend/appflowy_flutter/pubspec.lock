@@ -1492,7 +1492,7 @@ packages:
   muse_dsh_mobile:
     dependency: "direct main"
     description:
-      path: "../../../../../muse-dsh-mobile"
+      path: "../../../../middlewares/dsh/mobile/muse-dsh-mobile"
       relative: true
     source: path
     version: "0.2.0"

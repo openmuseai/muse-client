@@ -36,8 +36,8 @@ dependencies:
   muse_appflowy_facets:
     path: packages/muse_appflowy_facets
   muse_dsh_mobile:
-    path: ../../../../../muse-dsh-mobile
-    # Independent repo. When published:
+    path: ../../../../middlewares/dsh/mobile/muse-dsh-mobile
+    # Vendored in muse monorepo. If published later:
     # git:
     #   url: https://github.com/openmuseai/muse-dsh-mobile.git
     #   ref: main
