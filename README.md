@@ -39,9 +39,13 @@ Requires Flutter ≥ 3.27, Rust 1.85, cargo-make. See `frontend/appflowy_flutter
 # from repository root
 ./frontend/client/scripts/build-macos-appflowy.sh
 ./frontend/client/scripts/run-macos-appflowy.sh --skip-packages
+./frontend/client/scripts/pack-macos-client.sh
+python frontend/client/scripts/pack-windows-client.py
 ./frontend/client/scripts/build-android-client.sh --debug
 ./frontend/client/scripts/build-ios-client.sh --debug
 ```
+
+Windows 开箱即用分发说明：[doc/packaging-windows.md](doc/packaging-windows.md)。
 
 Artifacts: `frontend/client/dist/`.
 
@@ -50,8 +54,8 @@ The DSH sidecar used by the app is built from `middlewares/` (`./middlewares/scr
 ## Install
 
 - GitHub [Releases](https://github.com/openmuseai/openmuse/releases)
-- macOS: `DSH Office.app`
-- Windows: inno installer when published
+- macOS: `DSH Office.app`（`pack-macos-client.sh`）
+- Windows: zip / Inno 安装包（[`doc/packaging-windows.md`](doc/packaging-windows.md)）
 - Android / iOS: packages from Releases or local `dist/`
 
 ## Security

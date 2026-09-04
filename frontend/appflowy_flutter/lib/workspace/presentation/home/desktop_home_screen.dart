@@ -146,33 +146,36 @@ class DesktopHomeScreen extends StatelessWidget {
                             userId: userProfile.id,
                           ),
                         )..add(UserWorkspaceEvent.initialize()),
-                        child:
-                            BlocListener<UserWorkspaceBloc, UserWorkspaceState>(
-                          listenWhen: (previous, current) =>
-                              previous.currentWorkspace !=
-                              current.currentWorkspace,
-                          listener: (context, state) {
-                            if (!context.mounted) return;
-                            final workspaceBloc =
-                                context.read<UserWorkspaceBloc?>();
-                            final spaceBloc = context.read<SpaceBloc?>();
-                            CommandPalette.maybeOf(context)?.updateBlocs(
-                              workspaceBloc: workspaceBloc,
-                              spaceBloc: spaceBloc,
-                            );
-                            final workspace = state.currentWorkspace;
-                            if (workspace != null) {
-                              unawaited(DshWorkspaceBridge.publish(workspace));
-                            }
-                          },
-                          child: HomeHotKeys(
-                            userProfile: userProfile,
-                            child: FlowyContainer(
-                              Theme.of(context).colorScheme.surface,
-                              child: _buildBody(
-                                context,
-                                userProfile,
-                                workspaceLatest,
+                        child: _DshWorkspaceHintSync(
+                          child: BlocListener<UserWorkspaceBloc,
+                              UserWorkspaceState>(
+                            listenWhen: (previous, current) =>
+                                previous.currentWorkspace !=
+                                current.currentWorkspace,
+                            listener: (context, state) {
+                              if (!context.mounted) return;
+                              final workspaceBloc =
+                                  context.read<UserWorkspaceBloc?>();
+                              final spaceBloc = context.read<SpaceBloc?>();
+                              CommandPalette.maybeOf(context)?.updateBlocs(
+                                workspaceBloc: workspaceBloc,
+                                spaceBloc: spaceBloc,
+                              );
+                              final workspace = state.currentWorkspace;
+                              if (workspace != null) {
+                                unawaited(
+                                    DshWorkspaceBridge.publish(workspace));
+                              }
+                            },
+                            child: HomeHotKeys(
+                              userProfile: userProfile,
+                              child: FlowyContainer(
+                                Theme.of(context).colorScheme.surface,
+                                child: _buildBody(
+                                  context,
+                                  userProfile,
+                                  workspaceLatest,
+                                ),
                               ),
                             ),
                           ),
@@ -367,6 +370,36 @@ class DesktopHomeScreen extends StatelessWidget {
     if (space?.id != switchToSpaceNotifier.value?.id) {
       switchToSpaceNotifier.value = space;
     }
+  }
+}
+
+class _DshWorkspaceHintSync extends StatefulWidget {
+  const _DshWorkspaceHintSync({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_DshWorkspaceHintSync> createState() => _DshWorkspaceHintSyncState();
+}
+
+class _DshWorkspaceHintSyncState extends State<_DshWorkspaceHintSync> {
+  String? _publishedId;
+
+  @override
+  Widget build(BuildContext context) {
+    final workspace = context.watch<UserWorkspaceBloc>().state.currentWorkspace;
+    final id = workspace?.workspaceId;
+    if (workspace != null && id != _publishedId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final current =
+            context.read<UserWorkspaceBloc>().state.currentWorkspace;
+        if (current == null || current.workspaceId == _publishedId) return;
+        _publishedId = current.workspaceId;
+        unawaited(DshWorkspaceBridge.publish(current));
+      });
+    }
+    return widget.child;
   }
 }
 

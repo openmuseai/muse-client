@@ -53,8 +53,12 @@ mod log_filter;
 pub mod module;
 mod muse_host;
 mod muse_markdown;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 mod muse_runtime;
+#[cfg(unix)]
+mod muse_native_unix;
+#[cfg(windows)]
+mod muse_native_windows;
 mod muse_ui_context;
 mod muse_view_reference;
 mod muse_view_rename;
@@ -85,7 +89,7 @@ pub struct AppFlowyCore {
   pub muse_host_registry: Arc<muse_host_registry::HostCapabilityRegistry>,
   /// Owns concrete Muse Provider registrations and their explicit async shutdown path.
   muse_host_providers: Arc<muse_view_reference::MuseHostProviders>,
-  #[cfg(unix)]
+  #[cfg(any(unix, windows))]
   muse_host_runtime: Arc<tokio::sync::Mutex<Option<muse_runtime::AppFlowyMuseRuntime>>>,
 }
 
@@ -301,7 +305,7 @@ impl AppFlowyCore {
       muse_host_events.clone(),
     )
     .await;
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     let muse_host_runtime = muse_runtime::AppFlowyMuseRuntime::start(
       muse_host_registry.clone(),
       muse_host_policy,
@@ -371,7 +375,7 @@ impl AppFlowyCore {
       full_indexed_data_writer,
       muse_host_registry,
       muse_host_providers,
-      #[cfg(unix)]
+      #[cfg(any(unix, windows))]
       muse_host_runtime: Arc::new(tokio::sync::Mutex::new(muse_host_runtime)),
     }
   }
@@ -383,7 +387,7 @@ impl AppFlowyCore {
 
   /// Explicitly revokes Muse Providers, drains admitted invocations, and closes the Registry.
   pub async fn shutdown_muse_host(&self) {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     if let Some(runtime) = self.muse_host_runtime.lock().await.take() {
       runtime.shutdown().await;
     }

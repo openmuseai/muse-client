@@ -156,6 +156,7 @@ dependencies:
   unsplash_client: ^2.1.1
   url_launcher: ^6.1.11
   webview_flutter: ^4.13.0
+  webview_windows: ^0.4.0
   url_protocol:
 
   # Window Manager for MacOS and Linux

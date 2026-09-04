@@ -1,14 +1,13 @@
-import 'dart:io';
-
+import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_agent_controller.dart';
+import 'package:appflowy/plugins/dsh_agent/dsh_embedded_view.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_sidecar.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:flowy_infra_ui/style_widget/icon_button.dart';
 import 'package:flowy_infra_ui/style_widget/text.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 class DshAgentPanel extends StatefulWidget {
   const DshAgentPanel({super.key});
@@ -18,13 +17,11 @@ class DshAgentPanel extends StatefulWidget {
 }
 
 class _DshAgentPanelState extends State<DshAgentPanel> {
-  WebViewController? _webView;
-  String? _loadedUrl;
   String? _webViewError;
   DshAgentController? _controller;
-  bool _waitingForSidecar = true;
   final _apiKeyController = TextEditingController();
   var _savingKey = false;
+  var _embedEpoch = 0;
 
   @override
   void didChangeDependencies() {
@@ -48,32 +45,9 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
   void _onControllerChanged() {
     final controller = _controller;
     if (!mounted || controller == null) return;
-    if (controller.launching) {
-      _waitingForSidecar = true;
-      return;
+    if (controller.lastError != null && _webViewError != null) {
+      setState(() => _webViewError = null);
     }
-    if (controller.lastError != null) {
-      if (_webView != null || _webViewError != null) {
-        setState(() {
-          _webView = null;
-          _loadedUrl = null;
-          _webViewError = null;
-        });
-      }
-      return;
-    }
-    if (!controller.ready) return;
-    if (_webView != null &&
-        _loadedUrl == controller.url &&
-        _webViewError == null) {
-      _waitingForSidecar = false;
-      return;
-    }
-    _waitingForSidecar = false;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _ensureWebView(controller);
-    });
   }
 
   @override
@@ -175,19 +149,25 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
         onAction: () => _reload(controller),
       );
     }
-    final webView = _webView;
-    if (webView == null) {
+    if (!controller.ready) {
       return const Center(child: CircularProgressIndicator.adaptive());
     }
-    return ClipRect(child: WebViewWidget(controller: webView));
+    return ClipRect(
+      child: DshEmbeddedView(
+        key: ValueKey('$_embedEpoch:${controller.url}'),
+        url: controller.url,
+        onError: (message) {
+          if (!mounted) return;
+          setState(() => _webViewError = message);
+        },
+      ),
+    );
   }
 
   Future<void> _retry(DshAgentController controller) async {
     try {
       await getIt<DshSidecar>().ensureStarted();
-      if (mounted) {
-        _ensureWebView(controller, force: true);
-      }
+      if (mounted) _rebuildEmbeddedView();
     } catch (_) {}
   }
 
@@ -201,7 +181,7 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const FlowyText(
-                'Enter a DeepSeek API key to start the agent. It is stored only on this Mac.',
+                'Enter a DeepSeek API key to start the agent. It is stored only on this device.',
                 maxLines: 6,
                 textAlign: TextAlign.center,
               ),
@@ -268,70 +248,17 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
     );
   }
 
-  void _ensureWebView(DshAgentController controller, {bool force = false}) {
-    if (controller.launching ||
-        !controller.ready ||
-        controller.lastError != null) {
-      return;
-    }
-    if (!force &&
-        _webView != null &&
-        _loadedUrl == controller.url &&
-        _webViewError == null) {
-      return;
-    }
-    try {
-      // Do not call setBackgroundColor: WKWebView on macOS throws
-      // UnimplementedError ("opaque is not implemented on macOS"), which
-      // leaves a native platform view covering the Flutter surface.
-      final webView = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onWebResourceError: (error) {
-              if (!mounted) return;
-              // Plugin bundles 404ing must not replace the whole panel with
-              // "1004". Only the main document failing is a load error.
-              if (error.isForMainFrame == false) return;
-              final code = error.errorCode.abs();
-              if (code == 1004 ||
-                  error.errorType == WebResourceErrorType.connect) {
-                setState(() {
-                  _webView = null;
-                  _loadedUrl = null;
-                  _webViewError = null;
-                });
-                return;
-              }
-              setState(() {
-                _webViewError =
-                    'Could not load DSH (${error.errorCode}). Use Reload after the sidecar is ready, or Open in browser.';
-              });
-            },
-            onPageFinished: (_) {
-              if (!mounted || _webViewError == null) return;
-              setState(() => _webViewError = null);
-            },
-          ),
-        )
-        ..loadRequest(Uri.parse(controller.url));
-      setState(() {
-        _webView = webView;
-        _loadedUrl = controller.url;
-        _webViewError = null;
-      });
-    } catch (error) {
-      setState(() {
-        _webViewError =
-            'Embedded DSH view is unavailable on this macOS build.\n$error';
-      });
-    }
+  void _rebuildEmbeddedView() {
+    setState(() {
+      _webViewError = null;
+      _embedEpoch++;
+    });
   }
 
   Future<void> _reload(DshAgentController controller) async {
     try {
       await getIt<DshSidecar>().ensureStarted();
-      if (mounted) _ensureWebView(controller, force: true);
+      if (mounted) _rebuildEmbeddedView();
     } catch (_) {
       // The controller carries the redacted sidecar error into the panel.
     }
@@ -340,7 +267,7 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
   Future<void> _openInBrowser(DshAgentController controller) async {
     try {
       await getIt<DshSidecar>().ensureStarted();
-      await Process.run('open', [controller.url]);
+      await afLaunchUrlString(controller.url);
     } catch (_) {}
   }
 }

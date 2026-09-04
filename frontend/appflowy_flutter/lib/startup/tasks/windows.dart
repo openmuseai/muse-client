@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/startup/tasks/app_window_size_manager.dart';
+import 'package:appflowy/plugins/dsh_agent/dsh_sidecar.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 import 'package:scaled_app/scaled_app.dart';
@@ -135,9 +136,20 @@ class InitAppWindowTask extends LaunchTask with WindowListener {
   }
 
   @override
+  void onWindowClose() {
+    super.onWindowClose();
+    if (getIt.isRegistered<DshSidecar>()) {
+      unawaited(getIt<DshSidecar>().stop());
+    }
+  }
+
+  @override
   Future<void> dispose() async {
     await super.dispose();
 
     windowManager.removeListener(this);
+    if (getIt.isRegistered<DshSidecar>()) {
+      await getIt<DshSidecar>().stop();
+    }
   }
 }

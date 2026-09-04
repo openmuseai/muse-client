@@ -11,7 +11,9 @@ class DshAgentController extends ChangeNotifier {
     this.width = 420,
   });
 
-  final String url;
+  /// Loopback URL the embedded view loads. Starts as the origin; the sidecar
+  /// replaces it with the `dsh web:` URL that carries the launch token.
+  String url;
   double width;
   // Closed until restore() so the first home frame has no WKWebView. A native
   // WebView created during that frame covers the Flutter surface (black window).
@@ -60,6 +62,12 @@ class DshAgentController extends ChangeNotifier {
 
   void persistWidth() {
     unawaited(_persist(KVKeys.dshPanelWidth, width.round().toString()));
+  }
+
+  void setUrl(String value) {
+    if (url == value) return;
+    url = value;
+    notifyListeners();
   }
 
   void setLaunching(bool value) {

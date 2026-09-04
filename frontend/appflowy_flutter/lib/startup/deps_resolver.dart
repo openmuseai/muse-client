@@ -167,6 +167,9 @@ void _resolveHomeDeps(GetIt getIt) {
   getIt.registerLazySingleton<DshAgentController>(() => DshAgentController());
   getIt.registerLazySingleton<DshSidecar>(
     () => DshSidecar(getIt<DshAgentController>()),
+    dispose: (sidecar) async {
+      await sidecar.stop();
+    },
   );
   getIt.registerLazySingleton<DshDeviceTokenService>(
     DshDeviceTokenService.new,

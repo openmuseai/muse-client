@@ -120,6 +120,7 @@ FLUTTER_OUTPUT_DIR = "Debug"
 PRODUCT_EXT = "exe"
 CRATE_TYPE = "cdylib"
 LIB_EXT = "dll"
+BUILD_ARCHS = "x64"
 
 [env.production-windows-x86]
 CARGO_PROFILE = "release"
