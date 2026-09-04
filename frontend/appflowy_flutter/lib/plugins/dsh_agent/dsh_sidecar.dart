@@ -166,21 +166,64 @@ class DshSidecar {
     return _spawnFromSource(resolved, environment);
   }
 
+  /// Closure packages owned by the DSH install. Copying a subset into the
+  /// profile creates `node_modules/@deepseek-ai` with only Muse peers; Node
+  /// then fails ESM lookup for the rest of the web bundle
+  /// (`ERR_MODULE_NOT_FOUND` / "Did you mean …/lib/index.js"). Those packages
+  /// must come from `$DSH_HOME/profiles/node_modules` junctions that
+  /// `healProfilesModuleFallback` writes.
+  static bool isHostOwnedSeedPackage(String spec) {
+    return spec.startsWith('@deepseek-ai/');
+  }
+
+  /// Identity of the bundled closure this profile seed was copied from.
+  /// Changes when the install path or `@muse/dsh-appflowy` overlay changes, so
+  /// an upgrade from portable → setup.exe re-copies Muse plugins.
+  static String closureSeedGeneration(DshRuntimeLayout resolved) {
+    final dsh = File(
+      '${resolved.museRoot}/closure/node_modules/@deepseek-ai/dsh/package.json',
+    );
+    var version = '';
+    if (dsh.existsSync()) {
+      try {
+        final data = jsonDecode(dsh.readAsStringSync());
+        if (data is Map && data['version'] is String) {
+          version = data['version'] as String;
+        }
+      } catch (_) {}
+    }
+    final connector = File(
+      '${resolved.museRoot}/closure/node_modules/@muse/dsh-appflowy/dist/src/connector.js',
+    );
+    final stamp = connector.existsSync()
+        ? connector.lastModifiedSync().millisecondsSinceEpoch
+        : 0;
+    return '3\t${resolved.museRoot}\t$version\t$stamp';
+  }
+
   /// Closure (npm) layout: seed real copies of the @muse + dshmarket plugin
   /// graph into `$DSH_HOME/profiles/web/node_modules`. The Loader anchors
   /// bare-name resolution at the profile dir, and on Windows Node ESM refuses
-  /// symlinked node_modules entries, so plugins must be real directories. The
-  /// closure now carries every dependency (npm-installed from tarballs), so
-  /// copying the declared deps/peers recursively is sufficient. Copy-once with
-  /// a marker; sources never point outside the bundle.
+  /// symlinked node_modules entries, so plugins must be real directories.
+  /// Host `@deepseek-ai/*` packages stay out of the profile: the install
+  /// fallback supplies them. Re-seed when [closureSeedGeneration] changes.
   static void seedClosurePlugins(DshRuntimeLayout resolved) {
     final marker = File('${resolved.dshHome}/profiles/web/.muse-seeded');
-    if (marker.existsSync()) return;
+    final generation = closureSeedGeneration(resolved);
+    if (marker.existsSync() && marker.readAsStringSync() == generation) {
+      return;
+    }
     final closureNm = Directory('${resolved.museRoot}/closure/node_modules');
     if (!closureNm.existsSync()) return;
     final destRoots = [
       Directory('${resolved.dshHome}/profiles/web/node_modules'),
     ];
+    for (final destRoot in destRoots) {
+      final leakedHost = Directory('${destRoot.path}/@deepseek-ai');
+      if (leakedHost.existsSync()) {
+        leakedHost.deleteSync(recursive: true);
+      }
+    }
     final roots = <String>['dshmarket'];
     final museScope = Directory('${closureNm.path}/@muse');
     if (museScope.existsSync()) {
@@ -197,6 +240,7 @@ class DshSidecar {
     while (queue.isNotEmpty) {
       final spec = queue.removeLast();
       if (!seen.add(spec)) continue;
+      if (isHostOwnedSeedPackage(spec)) continue;
       final source = Directory('${closureNm.path}/$spec');
       final manifest = File('${source.path}/package.json');
       if (!manifest.existsSync()) continue;
@@ -214,8 +258,11 @@ class DshSidecar {
           final deps = data[kind];
           if (deps is Map) {
             for (final name in deps.keys) {
-              if (File('${closureNm.path}/$name/package.json').existsSync()) {
-                queue.add(name as String);
+              final specName = name as String;
+              if (isHostOwnedSeedPackage(specName)) continue;
+              if (File('${closureNm.path}/$specName/package.json')
+                  .existsSync()) {
+                queue.add(specName);
               }
             }
           }
@@ -226,7 +273,7 @@ class DshSidecar {
     }
     try {
       marker.parent.createSync(recursive: true);
-      marker.writeAsStringSync('1');
+      marker.writeAsStringSync(generation);
     } catch (_) {}
   }
 

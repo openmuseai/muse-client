@@ -82,6 +82,13 @@ class DshWebAuth {
           'in use by a leftover node process. Retry after the sidecar reclaims '
           'the port, or close that node.exe and retry.';
     }
+    const missingPrefix = 'Cannot find package ';
+    for (final line in logTail) {
+      final trimmed = line.trim();
+      if (trimmed.startsWith(missingPrefix)) {
+        return 'DSH sidecar exited with $code: $trimmed';
+      }
+    }
     for (final line in logTail.reversed) {
       final trimmed = line.trim();
       if (trimmed.startsWith('Error: dsh:')) {

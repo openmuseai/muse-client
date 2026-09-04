@@ -49,15 +49,41 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _host_owned_seed_package(spec: str) -> bool:
+    return spec.startswith("@deepseek-ai/")
+
+
+def _closure_seed_generation(muse: Path) -> str:
+    dsh = muse / "closure" / "node_modules" / "@deepseek-ai" / "dsh" / "package.json"
+    version = ""
+    if dsh.is_file():
+        try:
+            data = json.loads(dsh.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+        if isinstance(data, dict) and isinstance(data.get("version"), str):
+            version = data["version"]
+    connector = (
+        muse / "closure" / "node_modules" / "@muse" / "dsh-appflowy" / "dist" / "src" / "connector.js"
+    )
+    stamp = int(connector.stat().st_mtime * 1000) if connector.is_file() else 0
+    return f"3\t{muse}\t{version}\t{stamp}"
+
+
 def _seed_closure_plugins(muse: Path, dsh_home: Path) -> int:
-    """Mirror DshSidecar.seedClosurePlugins: real copies, no junctions."""
+    """Mirror DshSidecar.seedClosurePlugins: real copies, no host @deepseek-ai."""
     marker = dsh_home / "profiles" / "web" / ".muse-seeded"
-    if marker.is_file():
+    generation = _closure_seed_generation(muse)
+    if marker.is_file() and marker.read_text(encoding="utf-8") == generation:
         return 0
     closure_nm = muse / "closure" / "node_modules"
     dest_roots = [
         dsh_home / "profiles" / "web" / "node_modules",
     ]
+    for dest_root in dest_roots:
+        leaked_host = dest_root / "@deepseek-ai"
+        if leaked_host.exists() or leaked_host.is_symlink():
+            mw.rmtree_nofollow(leaked_host)
     roots = ["dshmarket"]
     muse_scope = closure_nm / "@muse"
     if muse_scope.is_dir():
@@ -70,6 +96,8 @@ def _seed_closure_plugins(muse: Path, dsh_home: Path) -> int:
         if spec in seen:
             continue
         seen.add(spec)
+        if _host_owned_seed_package(spec):
+            continue
         source = closure_nm / spec
         manifest = source / "package.json"
         if not manifest.is_file():
@@ -90,10 +118,12 @@ def _seed_closure_plugins(muse: Path, dsh_home: Path) -> int:
             if not isinstance(deps, dict):
                 continue
             for name in deps:
+                if _host_owned_seed_package(name):
+                    continue
                 if (closure_nm / name / "package.json").is_file():
                     queue.append(name)
     marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text("1\n", encoding="utf-8")
+    marker.write_text(generation, encoding="utf-8")
     return copied
 
 

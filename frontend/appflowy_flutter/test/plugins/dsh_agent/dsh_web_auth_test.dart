@@ -58,4 +58,17 @@ void main() {
       contains('127.0.0.1:3080 is already in use'),
     );
   });
+
+  test('summarizes ERR_MODULE_NOT_FOUND without the aggregate stack', () {
+    expect(
+      DshWebAuth.summarizeExit(1, [
+        'Error: dsh: plugin tree failed to load: loader entries failed to apply',
+        'Cannot find package \'@deepseek-ai/cordis-plugin-timer\' imported from C:\\profile\\web\\',
+        'Did you mean to import "@deepseek-ai/cordis-plugin-timer/lib/index.js"?',
+        'code: \'ERR_MODULE_NOT_FOUND\'',
+      ]),
+      'DSH sidecar exited with 1: Cannot find package '
+          '\'@deepseek-ai/cordis-plugin-timer\' imported from C:\\profile\\web\\',
+    );
+  });
 }
