@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:appflowy/brand/brand.dart';
 import 'package:flutter/material.dart';
 
 import 'package:appflowy/core/helpers/url_launcher.dart';
@@ -91,7 +92,7 @@ class FlowyMobileStateContainer extends StatelessWidget {
                       ),
                       OutlinedButton(
                         onPressed: () =>
-                            afLaunchUrlString('https://discord.gg/JucBXeU2FE'),
+                            afLaunchUrlString(Brand.githubDiscussionsUrl),
                         child: Text(
                           LocaleKeys.workspace_errorActions_reachOut.tr(),
                         ),

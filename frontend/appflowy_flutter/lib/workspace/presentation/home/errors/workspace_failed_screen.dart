@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:appflowy/brand/brand.dart';
 import 'package:flutter/material.dart';
 
 import 'package:appflowy/core/helpers/url_launcher.dart';
@@ -63,7 +64,7 @@ class _WorkspaceFailedScreenState extends State<WorkspaceFailedScreen> {
                         title: LocaleKeys.workspace_errorActions_reachOut.tr(),
                         height: 40,
                         onPressed: () =>
-                            afLaunchUrlString('https://discord.gg/JucBXeU2FE'),
+                            afLaunchUrlString(Brand.githubDiscussionsUrl),
                       ),
                     ),
                   ],

@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
@@ -121,32 +122,36 @@ class _BubbleActionListState extends State<BubbleActionList> {
         if (action is BubbleActionWrapper) {
           switch (action.inner) {
             case BubbleAction.whatsNews:
-              afLaunchUrlString('https://github.com/openmuseai/openmuse/releases');
+              afLaunchUrlString(Brand.githubReleasesUrl);
               break;
             case BubbleAction.getSupport:
-              afLaunchUrlString('https://github.com/openmuseai/openmuse/discussions');
+              afLaunchUrlString(Brand.githubDiscussionsUrl);
               break;
             case BubbleAction.debug:
               _DebugToast().show();
               break;
             case BubbleAction.shortcuts:
               afLaunchUrlString(
-                'https://github.com/openmuseai/openmuse/docs/appflowy/product/shortcuts',
+                Brand.isConfiguredUrl(Brand.docsUrl)
+                    ? Brand.docsUrl
+                    : Brand.siteUrl,
               );
               break;
             case BubbleAction.markdown:
               afLaunchUrlString(
-                'https://github.com/openmuseai/openmuse/docs/appflowy/product/markdown',
+                Brand.isConfiguredUrl(Brand.docsUrl)
+                    ? Brand.docsUrl
+                    : Brand.siteUrl,
               );
               break;
             case BubbleAction.github:
-              afLaunchUrlString(
-                'https://github.com/openmuseai/openmuse/issues/new/choose',
-              );
+              afLaunchUrlString(Brand.githubIssuesUrl);
               break;
             case BubbleAction.helpAndDocumentation:
               afLaunchUrlString(
-                'https://github.com/openmuseai/openmuse/guide',
+                Brand.isConfiguredUrl(Brand.docsUrl)
+                    ? Brand.docsUrl
+                    : Brand.siteUrl,
               );
               break;
           }

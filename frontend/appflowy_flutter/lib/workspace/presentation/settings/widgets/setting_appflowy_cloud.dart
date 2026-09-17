@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/env/cloud_env.dart';
 import 'package:appflowy/env/env.dart';
@@ -239,8 +240,7 @@ class AppFlowyCloudURLs extends StatelessWidget {
 class AppFlowySelfHostTip extends StatelessWidget {
   const AppFlowySelfHostTip({super.key});
 
-  final url =
-      "https://github.com/openmuseai/openmuse/docs/guides/appflowy/self-hosting-appflowy#build-appflowy-with-a-self-hosted-server";
+  String get url => Brand.docsOrSite;
 
   @override
   Widget build(BuildContext context) {

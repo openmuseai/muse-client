@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/shared/version_checker/version_checker.dart';
@@ -124,7 +125,7 @@ class _UpdateAppSection extends StatelessWidget {
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             onTap: () {
-              afLaunchUrlString('https://github.com/openmuseai/openmuse/releases');
+              afLaunchUrlString(Brand.githubReleasesUrl);
             },
             child: FlowyText.regular(
               LocaleKeys.autoUpdate_settingsUpdateWhatsNew.tr(),

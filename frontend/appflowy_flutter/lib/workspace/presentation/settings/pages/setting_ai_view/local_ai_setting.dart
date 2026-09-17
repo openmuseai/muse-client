@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
@@ -101,7 +102,7 @@ class LocalAiSettingHeader extends StatelessWidget {
                       },
                       onTap: () {
                         afLaunchUrlString(
-                          'https://github.com/openmuseai/openmuse/guide/appflowy-local-ai-ollama',
+                          Brand.docsOrSite,
                         );
                       },
                     ),

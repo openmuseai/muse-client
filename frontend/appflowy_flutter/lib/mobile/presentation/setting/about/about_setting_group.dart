@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/setting/widgets/mobile_setting_trailing.dart';
@@ -25,14 +26,14 @@ class AboutSettingGroup extends StatelessWidget {
           trailing: MobileSettingTrailing(
             text: '',
           ),
-          onTap: () => afLaunchUrlString('https://github.com/openmuseai/openmuse/privacy'),
+          onTap: () => afLaunchUrlString(Brand.privacyUrl),
         ),
         MobileSettingItem(
           name: LocaleKeys.settings_mobile_termsAndConditions.tr(),
           trailing: MobileSettingTrailing(
             text: '',
           ),
-          onTap: () => afLaunchUrlString('https://github.com/openmuseai/openmuse/terms'),
+          onTap: () => afLaunchUrlString(Brand.termsUrl),
         ),
         if (kDebugMode)
           MobileSettingItem(

@@ -1,4 +1,4 @@
-import 'package:appflowy/generated/flowy_svgs.g.dart';
+import 'package:appflowy/brand/brand.dart';
 import 'package:flutter/material.dart';
 
 class AFLogo extends StatelessWidget {
@@ -11,10 +11,11 @@ class AFLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FlowySvg(
-      FlowySvgs.app_logo_xl,
-      blendMode: null,
-      size: size,
+    return Image.asset(
+      Brand.logoAsset,
+      width: size.width,
+      height: size.height,
+      filterQuality: FilterQuality.high,
     );
   }
 }

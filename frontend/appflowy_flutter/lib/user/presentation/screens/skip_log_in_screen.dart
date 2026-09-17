@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/frameless_window.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
@@ -143,7 +144,7 @@ class SubscribeButtons extends StatelessWidget {
               hoverColor: Colors.transparent,
               fillColor: Colors.transparent,
               onPressed: () =>
-                  afLaunchUrlString('https://github.com/openmuseai/openmuse'),
+                  afLaunchUrlString(Brand.githubUrl),
             ),
           ],
         ),
@@ -160,7 +161,7 @@ class SubscribeButtons extends StatelessWidget {
               hoverColor: Colors.transparent,
               fillColor: Colors.transparent,
               onPressed: () =>
-                  afLaunchUrlString('https://github.com/openmuseai/openmuse/discussions'),
+                  afLaunchUrlString(Brand.githubDiscussionsUrl),
             ),
           ],
         ),

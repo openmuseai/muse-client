@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/features/share_tab/presentation/widgets/guest_tag.dart';
 import 'package:appflowy/features/workspace/logic/workspace_bloc.dart';
@@ -428,7 +429,7 @@ class _ImportNotionButton extends StatelessWidget {
             ),
             onPressed: () {
               afLaunchUrlString(
-                'https://github.com/openmuseai/openmuse/docs/guides/import-from-notion',
+                Brand.docsOrSite,
               );
             },
           ),

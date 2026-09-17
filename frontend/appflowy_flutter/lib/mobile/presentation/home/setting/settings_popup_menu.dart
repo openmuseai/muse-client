@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
@@ -127,7 +128,7 @@ class HomePageSettingsPopupMenu extends StatelessWidget {
   }
 
   void _openHelpPage(BuildContext context) {
-    afLaunchUrlString('https://discord.com/invite/9Q2xaN37tV');
+    afLaunchUrlString(Brand.githubDiscussionsUrl);
   }
 
   void _openSettingsPage(BuildContext context) {
@@ -135,7 +136,9 @@ class HomePageSettingsPopupMenu extends StatelessWidget {
   }
 
   void _openHelpAndDocumentationPage(BuildContext context) {
-    afLaunchUrlString('https://github.com/openmuseai/openmuse/guide');
+    afLaunchUrlString(
+      Brand.isConfiguredUrl(Brand.docsUrl) ? Brand.docsUrl : Brand.siteUrl,
+    );
   }
 }
 

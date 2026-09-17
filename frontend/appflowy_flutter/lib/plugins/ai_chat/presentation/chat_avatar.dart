@@ -1,3 +1,4 @@
+import 'package:appflowy/user/presentation/screens/sign_in_screen/widgets/logo/logo.dart';
 import 'package:flutter/material.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
@@ -24,13 +25,9 @@ class ChatAIAvatar extends StatelessWidget {
           side: BorderSide(color: Theme.of(context).colorScheme.outline),
         ),
       ),
-      child: const CircleAvatar(
+          child: const CircleAvatar(
         backgroundColor: Colors.transparent,
-        child: FlowySvg(
-          FlowySvgs.app_logo_s,
-          size: Size.square(16),
-          blendMode: null,
-        ),
+        child: AFLogo(size: Size.square(16)),
       ),
     );
   }

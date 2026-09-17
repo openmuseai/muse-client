@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
@@ -23,9 +24,7 @@ class WebUrlHintWidget extends StatelessWidget {
             FlowySvgs.information_s,
           ),
           onPressed: () {
-            afLaunchUrlString(
-              'https://github.com/openmuseai/openmuse/docs/self-host-appflowy-run-appflowy-web',
-            );
+            afLaunchUrlString(Brand.docsOrSite);
           },
         ),
       ),

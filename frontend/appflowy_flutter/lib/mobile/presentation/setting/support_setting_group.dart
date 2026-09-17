@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/mobile/presentation/bottom_sheet/show_mobile_bottom_sheet.dart';
@@ -29,13 +30,14 @@ class SupportSettingGroup extends StatelessWidget {
       builder: (context, snapshot) => MobileSettingGroup(
         groupTitle: LocaleKeys.settings_mobile_support.tr(),
         settingItemList: [
-          MobileSettingItem(
-            name: LocaleKeys.settings_mobile_joinDiscord.tr(),
-            trailing: MobileSettingTrailing(
-              text: '',
+          if (Brand.isConfiguredUrl(Brand.discordUrl))
+            MobileSettingItem(
+              name: LocaleKeys.settings_mobile_joinDiscord.tr(),
+              trailing: MobileSettingTrailing(
+                text: '',
+              ),
+              onTap: () => afLaunchUrlString(Brand.discordUrl),
             ),
-            onTap: () => afLaunchUrlString('https://discord.gg/JucBXeU2FE'),
-          ),
           MobileSettingItem(
             name: LocaleKeys.workspace_errorActions_reportIssue.tr(),
             trailing: MobileSettingTrailing(

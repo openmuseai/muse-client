@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/startup/tasks/device_info_task.dart';
 import 'package:appflowy_backend/log.dart';
@@ -66,7 +67,7 @@ class VersionChecker {
   Future<void> checkForUpdate() async {
     if (UniversalPlatform.isLinux) {
       // open the official website in the browser
-      await afLaunchUrlString('https://github.com/openmuseai/openmuse/download');
+      await afLaunchUrlString(Brand.downloadUrl);
     } else {
       await autoUpdater.checkForUpdates();
     }

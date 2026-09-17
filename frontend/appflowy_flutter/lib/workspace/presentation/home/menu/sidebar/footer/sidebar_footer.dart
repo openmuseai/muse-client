@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
@@ -28,7 +29,6 @@ class SidebarFooter extends StatelessWidget {
             },
           ),
         Row(
-          // mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Expanded(child: SidebarTemplateButton()),
             _buildVerticalDivider(context),
@@ -60,7 +60,7 @@ class SidebarTemplateButton extends StatelessWidget {
         FlowySvgs.icon_template_s,
       ),
       text: LocaleKeys.template_label.tr(),
-      onTap: () => afLaunchUrlString('https://github.com/openmuseai/openmuse/templates'),
+      onTap: () => afLaunchUrlString(Brand.siteUrl),
     );
   }
 }

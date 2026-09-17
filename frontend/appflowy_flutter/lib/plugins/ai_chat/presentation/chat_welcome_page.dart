@@ -1,4 +1,4 @@
-import 'package:appflowy/generated/flowy_svgs.g.dart';
+import 'package:appflowy/user/presentation/screens/sign_in_screen/widgets/logo/logo.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/util/theme_extension.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
@@ -45,11 +45,7 @@ class ChatWelcomePage extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const FlowySvg(
-          FlowySvgs.app_logo_xl,
-          size: Size.square(32),
-          blendMode: null,
-        ),
+        const AFLogo(size: Size.square(32)),
         const VSpace(16),
         FlowyText(
           fontSize: 15,

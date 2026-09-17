@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/startup/tasks/app_window_size_manager.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_sidecar.dart';
@@ -11,7 +12,8 @@ import 'package:window_manager/window_manager.dart';
 import 'package:universal_platform/universal_platform.dart';
 
 class InitAppWindowTask extends LaunchTask with WindowListener {
-  InitAppWindowTask({this.title = 'DSH Office'});
+  InitAppWindowTask({String? title})
+      : title = title ?? Brand.localizedProductName;
 
   final String title;
   final windowSizeManager = WindowSizeManager();

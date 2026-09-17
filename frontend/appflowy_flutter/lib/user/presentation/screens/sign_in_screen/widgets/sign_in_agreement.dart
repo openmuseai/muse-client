@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy_ui/appflowy_ui.dart';
@@ -32,7 +33,7 @@ class SignInAgreement extends StatelessWidget {
             style: underlinedTextStyle,
             mouseCursor: SystemMouseCursors.click,
             recognizer: TapGestureRecognizer()
-              ..onTap = () => afLaunchUrlString('https://github.com/openmuseai/openmuse/terms'),
+              ..onTap = () => afLaunchUrlString(Brand.termsUrl),
           ),
           TextSpan(
             text: '${LocaleKeys.web_and.tr()} ',
@@ -43,7 +44,7 @@ class SignInAgreement extends StatelessWidget {
             style: underlinedTextStyle,
             mouseCursor: SystemMouseCursors.click,
             recognizer: TapGestureRecognizer()
-              ..onTap = () => afLaunchUrlString('https://github.com/openmuseai/openmuse/privacy'),
+              ..onTap = () => afLaunchUrlString(Brand.privacyUrl),
           ),
         ],
       ),

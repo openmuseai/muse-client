@@ -1,3 +1,4 @@
+import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/shared/error_page/error_page.dart';
@@ -12,8 +13,7 @@ import 'package:flutter/material.dart';
 class ThemeUploadLearnMoreButton extends StatelessWidget {
   const ThemeUploadLearnMoreButton({super.key});
 
-  static const learnMoreURL =
-      'https://github.com/openmuseai/openmuse/docs/appflowy/product/themes';
+  static const learnMoreURL = Brand.siteUrl;
 
   @override
   Widget build(BuildContext context) {
