@@ -1,6 +1,10 @@
 mod folder_deps_chat_impl;
 mod folder_deps_database_impl;
 mod folder_deps_doc_impl;
+mod folder_deps_office_impl;
+mod folder_deps_word_impl;
+pub(crate) mod office_blob;
+pub(crate) mod word_blob;
 
 use crate::server_layer::ServerProvider;
 use collab_entity::{CollabType, EncodedCollab};
@@ -24,6 +28,8 @@ use std::sync::{Arc, Weak};
 use crate::deps_resolve::folder_deps::folder_deps_chat_impl::ChatFolderOperation;
 use crate::deps_resolve::folder_deps::folder_deps_database_impl::DatabaseFolderOperation;
 use crate::deps_resolve::folder_deps::folder_deps_doc_impl::DocumentFolderOperation;
+use crate::deps_resolve::folder_deps::folder_deps_office_impl::OfficeFolderOperation;
+use crate::deps_resolve::folder_deps::folder_deps_word_impl::WordFolderOperation;
 use collab_plugins::local_storage::kv::KVTransactionDB;
 use flowy_folder_pub::query::{FolderQueryService, FolderService, FolderViewEdit, QueryCollab};
 use lib_infra::async_trait::async_trait;
@@ -60,6 +66,7 @@ pub fn register_handlers(
   document_manager: Weak<DocumentManager>,
   database_manager: Weak<DatabaseManager>,
   chat_manager: Weak<AIManager>,
+  authenticate_user: Weak<AuthenticateUser>,
 ) {
   let document_folder_operation = Arc::new(DocumentFolderOperation(document_manager));
   folder_manager.register_operation_handler(ViewLayout::Document, document_folder_operation);
@@ -70,6 +77,22 @@ pub fn register_handlers(
   folder_manager.register_operation_handler(ViewLayout::Grid, database_folder_operation.clone());
   folder_manager.register_operation_handler(ViewLayout::Calendar, database_folder_operation);
   folder_manager.register_operation_handler(ViewLayout::Chat, chat_folder_operation);
+  folder_manager.register_operation_handler(
+    ViewLayout::Word,
+    Arc::new(WordFolderOperation(authenticate_user.clone())),
+  );
+  folder_manager.register_operation_handler(
+    ViewLayout::Excel,
+    Arc::new(OfficeFolderOperation::excel(authenticate_user.clone())),
+  );
+  folder_manager.register_operation_handler(
+    ViewLayout::Slides,
+    Arc::new(OfficeFolderOperation::slides(authenticate_user.clone())),
+  );
+  folder_manager.register_operation_handler(
+    ViewLayout::Pdf,
+    Arc::new(OfficeFolderOperation::pdf(authenticate_user)),
+  );
 }
 
 struct FolderUserImpl {

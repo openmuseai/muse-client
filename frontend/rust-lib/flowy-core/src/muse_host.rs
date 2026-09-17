@@ -7,6 +7,7 @@ use std::{
   sync::{Arc, Weak},
 };
 
+use flowy_folder::entities::view::ViewLayoutPB;
 use flowy_folder::manager::FolderManager;
 use flowy_user::user_manager::UserManager;
 use hmac::{Hmac, Mac};
@@ -186,14 +187,6 @@ impl AppFlowyAuthorityResolver {
       return Err(AuthorityError::Denied);
     }
 
-    if let Some(view_id) = &selected_view {
-      // get_view_pb applies AppFlowy's current guest/shared-view visibility rules.
-      folder
-        .get_view_pb(view_id)
-        .await
-        .map_err(|_| AuthorityError::Denied)?;
-    }
-
     let auth_type = format!("{:?}", server.get_auth_type());
     let scope_ref = match &selected_view {
       Some(view_id) => opaque_ref("scope", &(user_id, workspace_id, view_id)),
@@ -211,7 +204,15 @@ impl AppFlowyAuthorityResolver {
       ("appflowy.auth_type".to_string(), auth_type),
     ]);
     if let Some(view_id) = selected_view {
+      let view = folder
+        .get_view_pb(&view_id)
+        .await
+        .map_err(|_| AuthorityError::Denied)?;
       evidence.insert("appflowy.view".to_string(), view_id);
+      evidence.insert(
+        "appflowy.layout".to_string(),
+        layout_label(&view.layout).to_string(),
+      );
     }
     if current_selection {
       evidence.insert("appflowy.selection".to_string(), "current".to_string());
@@ -268,6 +269,20 @@ fn opaque_hash<T: Hash>(value: &T) -> u64 {
   let mut hasher = std::collections::hash_map::DefaultHasher::new();
   value.hash(&mut hasher);
   hasher.finish()
+}
+
+fn layout_label(layout: &ViewLayoutPB) -> &'static str {
+  match layout {
+    ViewLayoutPB::Document => "document",
+    ViewLayoutPB::Grid => "grid",
+    ViewLayoutPB::Board => "board",
+    ViewLayoutPB::Calendar => "calendar",
+    ViewLayoutPB::Chat => "chat",
+    ViewLayoutPB::Word => "word",
+    ViewLayoutPB::Excel => "excel",
+    ViewLayoutPB::Slides => "slides",
+    ViewLayoutPB::Pdf => "pdf",
+  }
 }
 
 #[cfg(test)]

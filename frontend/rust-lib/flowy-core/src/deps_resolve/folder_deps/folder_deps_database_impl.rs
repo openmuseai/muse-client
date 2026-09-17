@@ -203,7 +203,8 @@ impl FolderOperationHandler for DatabaseFolderOperation {
           ViewLayoutPB::Board => DatabaseLayoutPB::Board,
           ViewLayoutPB::Calendar => DatabaseLayoutPB::Calendar,
           ViewLayoutPB::Grid => DatabaseLayoutPB::Grid,
-          ViewLayoutPB::Document | ViewLayoutPB::Chat => {
+          ViewLayoutPB::Document | ViewLayoutPB::Chat | ViewLayoutPB::Word
+          | ViewLayoutPB::Excel | ViewLayoutPB::Slides | ViewLayoutPB::Pdf => {
             return Err(
               FlowyError::invalid_data().with_context("Can't handle document layout type"),
             );
@@ -245,7 +246,12 @@ impl FolderOperationHandler for DatabaseFolderOperation {
       ViewLayout::Grid => make_default_grid(&view_id, &name),
       ViewLayout::Board => make_default_board(&view_id, &name),
       ViewLayout::Calendar => make_default_calendar(&view_id, &name),
-      ViewLayout::Document | ViewLayout::Chat => {
+      ViewLayout::Document
+      | ViewLayout::Chat
+      | ViewLayout::Word
+      | ViewLayout::Excel
+      | ViewLayout::Slides
+      | ViewLayout::Pdf => {
         return Err(
           FlowyError::internal().with_context(format!("Can't handle {:?} layout type", layout)),
         );
@@ -323,7 +329,12 @@ impl FolderOperationHandler for DatabaseFolderOperation {
 
   async fn did_update_view(&self, old: &View, new: &View) -> Result<(), FlowyError> {
     let database_layout = match new.layout {
-      ViewLayout::Document | ViewLayout::Chat => {
+      ViewLayout::Document
+      | ViewLayout::Chat
+      | ViewLayout::Word
+      | ViewLayout::Excel
+      | ViewLayout::Slides
+      | ViewLayout::Pdf => {
         return Err(FlowyError::internal().with_context("Can't handle document layout type"));
       },
       ViewLayout::Grid => DatabaseLayoutPB::Grid,

@@ -53,6 +53,8 @@ mod log_filter;
 pub mod module;
 mod muse_host;
 mod muse_markdown;
+mod muse_workspace;
+mod muse_word;
 #[cfg(any(unix, windows))]
 mod muse_runtime;
 #[cfg(unix)]
@@ -269,6 +271,7 @@ impl AppFlowyCore {
         Arc::downgrade(&document_manager),
         Arc::downgrade(&database_manager),
         Arc::downgrade(&ai_manager),
+        Arc::downgrade(&authenticate_user),
       );
 
       (
@@ -302,6 +305,7 @@ impl AppFlowyCore {
       muse_host_registry.clone(),
       Arc::downgrade(&folder_manager),
       Arc::downgrade(&document_manager),
+      Arc::downgrade(&user_manager),
       muse_host_events.clone(),
     )
     .await;

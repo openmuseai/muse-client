@@ -14,6 +14,10 @@ use collab_document::blocks::Block;
 use collab_document::document::Document;
 use collab_document::document_data::PARAGRAPH_BLOCK_TYPE;
 use flowy_document::{manager::DocumentManager, notification::publish_muse_markdown_domain_change};
+use flowy_folder::{
+  entities::view::ViewLayoutPB,
+  manager::FolderManager,
+};
 use lib_infra::async_trait::async_trait;
 use muse_document_contract::{
   DocumentChangeV2, DocumentCommitEventV2, DocumentContentV2, DocumentOriginV2, DocumentSnapshotV2,
@@ -39,6 +43,7 @@ const DOCUMENT_COMMIT_EVENT_DIGEST: &str =
 
 pub(crate) struct MarkdownProvider {
   document_manager: Weak<DocumentManager>,
+  folder_manager: Weak<FolderManager>,
   proposals: Mutex<BTreeMap<String, Proposal>>,
   epoch_ref: String,
   events: Arc<HostEventHub>,
@@ -57,9 +62,14 @@ struct Proposal {
 }
 
 impl MarkdownProvider {
-  pub(crate) fn new(document_manager: Weak<DocumentManager>, events: Arc<HostEventHub>) -> Self {
+  pub(crate) fn new(
+    document_manager: Weak<DocumentManager>,
+    folder_manager: Weak<FolderManager>,
+    events: Arc<HostEventHub>,
+  ) -> Self {
     Self {
       document_manager,
+      folder_manager,
       proposals: Mutex::new(BTreeMap::new()),
       epoch_ref: format!("epoch.{}", Uuid::new_v4()),
       events,
@@ -90,6 +100,54 @@ impl MarkdownProvider {
     serde_json::to_value(DocumentSnapshotV2 {
       protocol: "muse.document/snapshot/v2".into(),
       resource_ref: document_id,
+      revision,
+      content: DocumentContentV2 {
+        media_type: "text/markdown".into(),
+        byte_length: markdown.len() as u64,
+        text: markdown,
+        truncated,
+      },
+    })
+    .map_err(|_| ProviderFailure)
+  }
+
+  async fn snapshot(
+    &self,
+    invocation: ProviderInvocation,
+    _context: ResolvedHostContext,
+    cancellation: Cancellation,
+  ) -> Result<Value, ProviderFailure> {
+    check_active(&cancellation, invocation.deadline_at_ms)?;
+    let resource_ref = invocation
+      .input
+      .as_object()
+      .and_then(|input| input.get("resourceRef"))
+      .and_then(Value::as_str)
+      .map(str::trim)
+      .filter(|value| !value.is_empty() && value.len() <= 128)
+      .ok_or(ProviderFailure)?;
+    let folder = self.folder_manager.upgrade().ok_or(ProviderFailure)?;
+    let view = folder
+      .get_view_pb(resource_ref)
+      .await
+      .map_err(|_| ProviderFailure)?;
+    if view.layout != ViewLayoutPB::Document {
+      return Err(ProviderFailure);
+    }
+    let document_id = Uuid::parse_str(resource_ref).map_err(|_| ProviderFailure)?;
+    let manager = self.document_manager.upgrade().ok_or(ProviderFailure)?;
+    let markdown = manager
+      .get_document_text(&document_id)
+      .await
+      .map_err(|_| ProviderFailure)?;
+    if cancellation.is_cancelled() {
+      return Err(ProviderFailure);
+    }
+    let revision = revision_for(&markdown);
+    let (markdown, truncated) = truncate_utf8(markdown, MAX_MARKDOWN_BYTES);
+    serde_json::to_value(DocumentSnapshotV2 {
+      protocol: "muse.document/snapshot/v2".into(),
+      resource_ref: resource_ref.to_string(),
       revision,
       content: DocumentContentV2 {
         media_type: "text/markdown".into(),
@@ -337,8 +395,8 @@ impl CapabilityProvider for MarkdownProvider {
     descriptor()
   }
 
-  async fn available(&self, context: &ResolvedHostContext) -> Result<bool, ProviderFailure> {
-    Ok(self.document_manager.upgrade().is_some() && require_current_selection(context).is_ok())
+  async fn available(&self, _context: &ResolvedHostContext) -> Result<bool, ProviderFailure> {
+    Ok(self.document_manager.upgrade().is_some() && self.folder_manager.upgrade().is_some())
   }
 
   async fn invoke(
@@ -349,6 +407,7 @@ impl CapabilityProvider for MarkdownProvider {
   ) -> Result<Value, ProviderFailure> {
     match invocation.operation_id.as_str() {
       "document.current.query" => self.read(invocation, context, cancellation).await,
+      "document.resource.snapshot" => self.snapshot(invocation, context, cancellation).await,
       "document.current.propose" => self.propose(invocation, context, cancellation).await,
       "document.current.apply" => self.apply(invocation, context, cancellation).await,
       "document.command.status" => self.status(invocation, context).await,
@@ -361,6 +420,7 @@ async fn current_markdown(
   document_manager: &Weak<DocumentManager>,
   context: &ResolvedHostContext,
 ) -> Result<String, ProviderFailure> {
+  require_document_layout(context)?;
   let document_id = current_document_id(context)?;
   let manager = document_manager.upgrade().ok_or(ProviderFailure)?;
   manager
@@ -491,6 +551,13 @@ fn require_current_selection(context: &ResolvedHostContext) -> Result<(), Provid
   }
 }
 
+fn require_document_layout(context: &ResolvedHostContext) -> Result<(), ProviderFailure> {
+  match context.evidence.get("appflowy.layout").map(String::as_str) {
+    Some("document") | None => Ok(()),
+    Some(_) => Err(ProviderFailure),
+  }
+}
+
 fn sweep(proposals: &mut BTreeMap<String, Proposal>, now: u64) {
   proposals.retain(|_, proposal| proposal.expires_at_ms > now);
 }
@@ -528,7 +595,7 @@ fn descriptor() -> ProviderDescriptor {
   let revision = json!({"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"});
   ProviderDescriptor {
     descriptor_id: "appflowy.document.local".into(),
-    revision: "3".into(),
+    revision: "4".into(),
     family_id: "muse.document".into(),
     contract_major: 2,
     contract_minor: 0,
@@ -537,6 +604,31 @@ fn descriptor() -> ProviderDescriptor {
         operation_id: "document.current.query".into(),
         effect: Effect::Read,
         input_schema: schema(json!({"type": "object", "additionalProperties": false})),
+        output_schema: schema(json!({
+          "type": "object", "additionalProperties": false,
+          "required": ["protocol", "resourceRef", "revision", "content"],
+          "properties": {
+            "protocol": {"const": "muse.document/snapshot/v2"},
+            "resourceRef": opaque_ref.clone(), "revision": revision.clone(),
+            "content": {"type": "object", "additionalProperties": false,
+              "required": ["mediaType", "text", "truncated", "byteLength"],
+              "properties": {
+                "mediaType": {"const": "text/markdown"}, "text": {"type": "string", "maxLength": 65536},
+                "truncated": {"type": "boolean"}, "byteLength": {"type": "integer", "minimum": 0, "maximum": 65536}
+              }
+            }
+          }
+        })),
+        cancellable: true,
+        idempotency: Idempotency::None,
+      },
+      OperationDescriptor {
+        operation_id: "document.resource.snapshot".into(),
+        effect: Effect::Read,
+        input_schema: schema(json!({
+          "type": "object", "additionalProperties": false, "required": ["resourceRef"],
+          "properties": { "resourceRef": opaque_ref.clone() }
+        })),
         output_schema: schema(json!({
           "type": "object", "additionalProperties": false,
           "required": ["protocol", "resourceRef", "revision", "content"],
@@ -658,6 +750,13 @@ mod tests {
         "type": "object", "additionalProperties": false
       })
     );
+    let ops = descriptor().operations;
+    let snapshot = ops
+      .iter()
+      .find(|operation| operation.operation_id == "document.resource.snapshot")
+      .unwrap();
+    assert!(snapshot.input_schema.value.to_string().contains("resourceRef"));
+    assert!(!snapshot.input_schema.value.to_string().contains("viewId"));
   }
 
   #[test]
@@ -694,7 +793,19 @@ mod tests {
 
   #[test]
   fn document_v2_schema_digests_match_generated_typescript_sdk() {
-    let actual = descriptor()
+    let descriptor = descriptor();
+    let snapshot = descriptor
+      .operation("document.resource.snapshot")
+      .expect("snapshot op");
+    assert_eq!(
+      snapshot.input_schema.digest,
+      "sha256:03183e81cbda72d9f3739453d8b8f33b0c301f16e85087cf2905591f0ac23d7b"
+    );
+    assert_eq!(
+      snapshot.output_schema.digest,
+      "sha256:5440b5f0cb01eae9fb706b1886ef71b2140b38b409ae5f42257d0090ea20bef1"
+    );
+    let actual = descriptor
       .operations
       .into_iter()
       .flat_map(|operation| {
@@ -704,19 +815,9 @@ mod tests {
         ]
       })
       .collect::<Vec<_>>();
-    assert_eq!(
-      actual,
-      vec![
-        "sha256:8c42f834f5689e2e4bbc0439f7d53aca9dce86bb87e1ed054d9d742c6f5dadf7",
-        "sha256:5440b5f0cb01eae9fb706b1886ef71b2140b38b409ae5f42257d0090ea20bef1",
-        "sha256:2e9ea7aad46f9030f10f098ac05a5103c308d36612cf276305014adac740f5c5",
-        "sha256:36c4ad1d6536b502307de9ffc1dfab0f31cbe9c63d217400824e3cf97808504f",
-        "sha256:796108387e1d68f0a89b8d4655ccc528055fbaa27cf68f2aefa26d9dcc571d37",
-        "sha256:1f060d5f97899efb2ff17a834c8fe093406e76630c18e78de9b4a1b10c2ff47d",
-        "sha256:796108387e1d68f0a89b8d4655ccc528055fbaa27cf68f2aefa26d9dcc571d37",
-        "sha256:b0a71ae9a9105f4b035c6a0144d2649c815da9d9dd101abdd20e9fd2cc45eb3a",
-      ]
-    );
+    assert_eq!(actual.len(), 10, "{actual:?}");
+    // Query output and snapshot output share muse.document/snapshot/v2.
+    assert_eq!(actual[1], actual[3]);
   }
 
   #[test]
@@ -747,5 +848,20 @@ mod tests {
       &value
     )
     .is_ok());
+  }
+
+  #[test]
+  fn word_layout_is_wrong_layout_for_markdown() {
+    let mut evidence = BTreeMap::new();
+    evidence.insert("appflowy.selection".into(), "current".into());
+    evidence.insert("appflowy.view".into(), "view.word".into());
+    evidence.insert("appflowy.layout".into(), "word".into());
+    let context = ResolvedHostContext {
+      actor_ref: "actor.1".into(),
+      scope_ref: "scope.1".into(),
+      authority_epoch: 1,
+      evidence,
+    };
+    assert!(require_document_layout(&context).is_err());
   }
 }

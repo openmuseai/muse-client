@@ -59,6 +59,7 @@ uuid.workspace = true
 sysinfo = "0.30.5"
 semver = { version = "1.0.22", features = ["serde"] }
 url = "2.5.0"
+zip = { workspace = true }
 once_cell = "1.19.0"
 hmac = "0.12"
 sha2 = "0.10"

@@ -17,6 +17,7 @@ use flowy_user_pub::workspace_service::UserWorkspaceService;
 use lib_infra::box_any::BoxAny;
 use semver::Version;
 use serde_json::Value;
+use std::path::PathBuf;
 use std::string::ToString;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Weak};
@@ -672,6 +673,10 @@ impl UserManager {
     let session = self.get_session()?;
     let uuid = Uuid::from_str(&session.workspace_id)?;
     Ok(uuid)
+  }
+
+  pub fn user_data_dir(&self) -> Result<PathBuf, FlowyError> {
+    self.authenticate_user.get_user_data_dir()
   }
 
   pub fn token(&self) -> Result<Option<String>, FlowyError> {

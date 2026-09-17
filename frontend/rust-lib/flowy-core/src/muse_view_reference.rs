@@ -11,6 +11,7 @@ use flowy_folder::{
   entities::view::{ViewLayoutPB, ViewPB},
   manager::FolderManager,
 };
+use flowy_user::user_manager::UserManager;
 use lib_infra::async_trait::async_trait;
 use muse_host_events::HostEventHub;
 use muse_host_registry::{
@@ -40,6 +41,7 @@ impl MuseHostProviders {
     registry: Arc<HostCapabilityRegistry>,
     folder_manager: Weak<FolderManager>,
     document_manager: Weak<DocumentManager>,
+    user_manager: Weak<UserManager>,
     events: Arc<HostEventHub>,
   ) -> Arc<Self> {
     let owner = Arc::new(Self {
@@ -50,24 +52,38 @@ impl MuseHostProviders {
       .register(Arc::new(ViewReferenceProvider::new(folder_manager.clone())))
       .await
       .expect("static Muse AppFlowy View Provider registration must succeed");
+    let workspace_lease = registry
+      .register(Arc::new(crate::muse_workspace::WorkspaceProvider::new(
+        folder_manager.clone(),
+      )))
+      .await
+      .expect("static Muse AppFlowy Workspace Provider registration must succeed");
     let rename_lease = registry
       .register(Arc::new(crate::muse_view_rename::ViewRenameProvider::new(
-        folder_manager,
+        folder_manager.clone(),
       )))
       .await
       .expect("static Muse AppFlowy View rename Provider registration must succeed");
     let markdown_lease = registry
       .register(Arc::new(crate::muse_markdown::MarkdownProvider::new(
         document_manager,
+        folder_manager.clone(),
         events,
       )))
       .await
       .expect("static Muse AppFlowy Markdown Provider registration must succeed");
+    let word_lease = registry
+      .register(Arc::new(crate::muse_word::WordProvider::new(
+        folder_manager,
+        user_manager,
+      )))
+      .await
+      .expect("static Muse AppFlowy Word Provider registration must succeed");
     owner
       .leases
       .lock()
       .await
-      .extend([lease, rename_lease, markdown_lease]);
+      .extend([lease, workspace_lease, rename_lease, markdown_lease, word_lease]);
     owner
   }
 
@@ -324,6 +340,10 @@ fn layout_name(layout: &ViewLayoutPB) -> Result<&'static str, ProviderFailure> {
     ViewLayoutPB::Board => Ok("board"),
     ViewLayoutPB::Calendar => Ok("calendar"),
     ViewLayoutPB::Chat => Ok("chat"),
+    ViewLayoutPB::Word => Ok("word"),
+    ViewLayoutPB::Excel => Ok("excel"),
+    ViewLayoutPB::Slides => Ok("slides"),
+    ViewLayoutPB::Pdf => Ok("pdf"),
   }
 }
 
@@ -375,7 +395,7 @@ fn view_reference_descriptor() -> ProviderDescriptor {
             "properties": {
               "title": {"type": "string", "maxLength": 256},
               "titleTruncated": {"type": "boolean"},
-              "layout": {"enum": ["document", "grid", "board", "calendar", "chat"]},
+              "layout": {"enum": ["document", "grid", "board", "calendar", "chat", "word"]},
               "locked": {"type": ["boolean", "null"]},
               "childCount": {"type": "integer", "minimum": 0, "maximum": 256}
             }
@@ -388,7 +408,7 @@ fn view_reference_descriptor() -> ProviderDescriptor {
               "properties": {
                 "title": {"type": "string", "maxLength": 256},
                 "titleTruncated": {"type": "boolean"},
-                "layout": {"enum": ["document", "grid", "board", "calendar", "chat"]},
+                "layout": {"enum": ["document", "grid", "board", "calendar", "chat", "word"]},
                 "locked": {"type": ["boolean", "null"]}
               }
             }

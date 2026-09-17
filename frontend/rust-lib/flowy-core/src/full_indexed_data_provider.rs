@@ -252,7 +252,11 @@ impl FullIndexedDataWriter {
         let collab_type = match view.layout {
           ViewLayout::Document => CollabType::Document,
           ViewLayout::Grid | ViewLayout::Board | ViewLayout::Calendar => CollabType::Database,
-          ViewLayout::Chat => continue,
+          ViewLayout::Chat
+          | ViewLayout::Word
+          | ViewLayout::Excel
+          | ViewLayout::Slides
+          | ViewLayout::Pdf => continue,
         };
 
         // Parse UUID once, outside the match
