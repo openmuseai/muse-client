@@ -192,6 +192,10 @@ pub enum ViewLayoutPB {
   Board = 2,
   Calendar = 3,
   Chat = 4,
+  Word = 9,
+  Excel = 10,
+  Slides = 11,
+  Pdf = 12,
 }
 
 impl ViewLayoutPB {
@@ -199,6 +203,13 @@ impl ViewLayoutPB {
     matches!(
       self,
       ViewLayoutPB::Grid | ViewLayoutPB::Board | ViewLayoutPB::Calendar
+    )
+  }
+
+  pub fn is_office_blob(&self) -> bool {
+    matches!(
+      self,
+      ViewLayoutPB::Word | ViewLayoutPB::Excel | ViewLayoutPB::Slides | ViewLayoutPB::Pdf
     )
   }
 }
@@ -211,6 +222,10 @@ impl std::convert::From<ViewLayout> for ViewLayoutPB {
       ViewLayout::Document => ViewLayoutPB::Document,
       ViewLayout::Calendar => ViewLayoutPB::Calendar,
       ViewLayout::Chat => ViewLayoutPB::Chat,
+      ViewLayout::Word => ViewLayoutPB::Word,
+      ViewLayout::Excel => ViewLayoutPB::Excel,
+      ViewLayout::Slides => ViewLayoutPB::Slides,
+      ViewLayout::Pdf => ViewLayoutPB::Pdf,
     }
   }
 }

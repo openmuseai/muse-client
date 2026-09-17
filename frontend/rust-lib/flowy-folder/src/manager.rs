@@ -1322,7 +1322,11 @@ impl FolderManager {
           let collab_type = match duplicated_view.layout {
             ViewLayout::Document => CollabType::Document,
             ViewLayout::Board | ViewLayout::Grid | ViewLayout::Calendar => CollabType::Database,
-            ViewLayout::Chat => CollabType::Unknown,
+            ViewLayout::Chat
+            | ViewLayout::Word
+            | ViewLayout::Excel
+            | ViewLayout::Slides
+            | ViewLayout::Pdf => CollabType::Unknown,
           };
           // don't block the whole import process if the view can't be encoded
           if collab_type != CollabType::Unknown {
@@ -1703,10 +1707,10 @@ impl FolderManager {
       })?
     };
 
-    if view.layout == ViewLayout::Chat {
+    if view.layout == ViewLayout::Chat || view.layout.is_office_blob() {
       return Err(FlowyError::new(
         ErrorCode::NotSupportYet,
-        "The chat view is not supported to publish.".to_string(),
+        "This view layout is not supported to publish.".to_string(),
       ));
     }
 
@@ -1855,8 +1859,8 @@ impl FolderManager {
         Err(_) => continue,
       };
 
-      // Skip the chat view
-      if view.layout == ViewLayoutPB::Chat {
+      // Skip chat and office-blob views — they are not Document collab and must not publish.
+      if view.layout == ViewLayoutPB::Chat || view.layout.is_office_blob() {
         continue;
       }
 
