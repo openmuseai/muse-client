@@ -18,6 +18,17 @@ import 'package:appflowy/user/application/reminder/reminder_bloc.dart';
 import 'package:appflowy/user/application/user_listener.dart';
 import 'package:appflowy/user/presentation/router.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_agent_controller.dart';
+import 'package:appflowy/plugins/resource_surface/resource_tab_action_registry.dart';
+import 'package:appflowy/plugins/resource_surface/resource_tab_actions.dart';
+import 'package:appflowy/plugins/version_diff/application/text_version_diff_service.dart';
+import 'package:appflowy/plugins/version_diff/application/image_overlay_diff_service.dart';
+import 'package:appflowy/plugins/version_diff/application/text_version_repository.dart';
+import 'package:appflowy/plugins/version_diff/domain/diff_workbench_contract.dart';
+import 'package:appflowy/plugins/version_diff/domain/version_diff_contract.dart';
+import 'package:appflowy/plugins/version_diff/generic/binary_metadata_diff_provider.dart';
+import 'package:appflowy/plugins/version_diff/image/image_overlay_diff_provider.dart';
+import 'package:appflowy/plugins/version_diff/presentation/resource_version_pane.dart';
+import 'package:appflowy/plugins/version_diff/text/text_diff_provider.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_sidecar.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_device_token_service.dart';
 import 'package:appflowy/workspace/application/action_navigation/action_navigation_bloc.dart';
@@ -35,6 +46,10 @@ import 'package:appflowy/workspace/application/user/prelude.dart';
 import 'package:appflowy/workspace/application/view/prelude.dart';
 import 'package:appflowy/workspace/application/workspace/prelude.dart';
 import 'package:appflowy/workspace/presentation/home/menu/menu_shared_state.dart';
+import 'package:appflowy/workspace_platform/application/workspace_controller.dart';
+import 'package:appflowy/workspace_platform/infrastructure/local_workspace_provider.dart';
+import 'package:appflowy/workspace_platform/infrastructure/workspace_persistence.dart';
+import 'package:appflowy/workspace_platform/infrastructure/workspace_provider.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/protobuf.dart';
@@ -165,6 +180,85 @@ void _resolveHomeDeps(GetIt getIt) {
   getIt.registerSingleton<RenameViewBloc>(RenameViewBloc(PopoverController()));
 
   getIt.registerLazySingleton<DshAgentController>(() => DshAgentController());
+  final workspaceProviders = MuseWorkspaceProviderRegistry()
+    ..register(MuseLocalWorkspaceProvider());
+  getIt.registerSingleton<MuseWorkspaceProviderRegistry>(workspaceProviders);
+  getIt.registerLazySingleton<MuseWorkspacePersistence>(
+    MuseWorkspacePersistence.new,
+  );
+  getIt.registerLazySingleton<MuseWorkspaceController>(
+    () => MuseWorkspaceController(
+      providers: getIt<MuseWorkspaceProviderRegistry>(),
+      persistence: getIt<MuseWorkspacePersistence>(),
+    ),
+    dispose: (controller) => controller.dispose(),
+  );
+  getIt.registerLazySingleton<MuseTextVersionRepository>(
+    MuseTextVersionRepository.new,
+  );
+  final textDiffProvider = MuseTextDiffProvider();
+  final imageDiffProvider = MuseImageOverlayDiffProvider();
+  final diffProviders = MuseDiffProviderRegistry()
+    ..register(textDiffProvider)
+    ..register(imageDiffProvider);
+  final semanticDiffProviders = MuseSemanticDiffProviderRegistry()
+    ..register(MuseBinaryMetadataDiffProvider())
+    ..register(imageDiffProvider)
+    ..register(textDiffProvider);
+  final diffRenderers = MuseDiffRendererRegistry()
+    ..register(
+      MuseDiffRendererManifest(
+        id: 'muse.diff-viewer.text.v2',
+        supportedChangeSchemas: {'muse.diff.changeset.v1'},
+        modes: {MuseDiffViewMode.sideBySide, MuseDiffViewMode.unified},
+        capabilities: const MuseDiffRendererCapabilities(
+          selection: true,
+          copy: true,
+          search: true,
+          syncScroll: true,
+          alignment: true,
+          folding: true,
+          overview: true,
+        ),
+      ),
+    )
+    ..register(
+      MuseDiffRendererManifest(
+        id: 'muse.diff-viewer.image-overlay.v1',
+        supportedChangeSchemas: {'muse.diff.image-overlay.changeset.v1'},
+        modes: {MuseDiffViewMode.overlay, MuseDiffViewMode.sideBySide},
+        capabilities: const MuseDiffRendererCapabilities(
+          selection: false,
+          copy: false,
+          search: false,
+        ),
+      ),
+    );
+  getIt.registerSingleton<MuseTextDiffProvider>(textDiffProvider);
+  getIt.registerSingleton<MuseImageOverlayDiffProvider>(imageDiffProvider);
+  getIt.registerSingleton<MuseDiffProviderRegistry>(diffProviders);
+  getIt.registerSingleton<MuseSemanticDiffProviderRegistry>(
+    semanticDiffProviders,
+  );
+  getIt.registerSingleton<MuseDiffRendererRegistry>(diffRenderers);
+  getIt.registerLazySingleton<MuseResourceVersionPaneRegistry>(
+    MuseResourceVersionPaneRegistry.new,
+  );
+  getIt.registerLazySingleton<MuseTextVersionDiffService>(
+    () => MuseTextVersionDiffService(
+      repository: getIt<MuseTextVersionRepository>(),
+      provider: getIt<MuseTextDiffProvider>(),
+    ),
+  );
+  getIt.registerLazySingleton<MuseImageOverlayDiffService>(
+    () => MuseImageOverlayDiffService(
+      repository: getIt<MuseTextVersionRepository>(),
+      provider: getIt<MuseImageOverlayDiffProvider>(),
+    ),
+  );
+  final resourceTabActions = MuseResourceTabActionRegistry();
+  registerDefaultMuseResourceTabActions(resourceTabActions);
+  getIt.registerSingleton<MuseResourceTabActionRegistry>(resourceTabActions);
   getIt.registerLazySingleton<DshSidecar>(
     () => DshSidecar(getIt<DshAgentController>()),
     dispose: (sidecar) async {

@@ -1,5 +1,7 @@
 library;
 
+import 'dart:async';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/startup/plugin/plugin.dart';
 import 'package:appflowy/startup/startup.dart';
@@ -19,6 +21,12 @@ enum PluginType {
   calendar,
   databaseDocument,
   chat,
+  word,
+  excel,
+  slides,
+  pdf,
+  resource,
+  diff,
 }
 
 typedef PluginId = String;
@@ -38,6 +46,31 @@ abstract class Plugin {
     notifier?.dispose();
   }
 }
+
+/// Optional contribution point for actions shown in the standard Host tab
+/// menu. Plugins can expose their own actions while the tab control remains
+/// owned by the Host.
+abstract interface class PluginTabMenuContributor {
+  List<PluginTabMenuAction> tabMenuActions(BuildContext context);
+}
+
+abstract interface class PluginTabMenuAction {
+  String get id;
+  String get label;
+  IconData? get icon;
+  int get group;
+  bool get enabled;
+  FutureOr<void> invoke(BuildContext context);
+
+  /// Hover/click cascade opened to the right of this row. Null means a
+  /// regular action that runs [invoke].
+  PluginTabMenuSubmenuBuilder? get submenuBuilder;
+}
+
+typedef PluginTabMenuSubmenuBuilder = Widget Function(
+  BuildContext context,
+  VoidCallback closeMenu,
+);
 
 abstract class PluginNotifier<T> {
   /// Notify if the plugin get deleted
