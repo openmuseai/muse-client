@@ -1,6 +1,6 @@
 <h1 align="center" style="border-bottom: none">
-    <img src="brand/logo.png" alt="DSH Office" width="120" /><br>
-    <b>DSH Office</b>
+    <img src="brand/logo.png" alt="OpenMuse" width="120" /><br>
+    <b>OpenMuse</b>
 </h1>
 
 > **AI-native office suite built on DSH.**
@@ -41,11 +41,13 @@ Requires Flutter ≥ 3.27, Rust 1.85, cargo-make. See `frontend/appflowy_flutter
 ./frontend/client/scripts/run-macos-appflowy.sh --skip-packages
 ./frontend/client/scripts/pack-macos-client.sh
 python frontend/client/scripts/pack-windows-client.py
-./frontend/client/scripts/build-android-client.sh --debug
+./frontend/client/scripts/pack-android-client.sh
 ./frontend/client/scripts/build-ios-client.sh --debug
 ```
 
 Windows 开箱即用分发说明：[doc/packaging-windows.md](doc/packaging-windows.md)。
+macOS 开箱即用分发说明：[doc/packaging-macos.md](doc/packaging-macos.md)。
+Android 打包 / 真机验证 / 生产推送：[doc/android/README.md](doc/android/README.md)。
 
 Artifacts: `frontend/client/dist/`.
 
@@ -54,9 +56,10 @@ The DSH sidecar used by the app is built from `middlewares/` (`./middlewares/scr
 ## Install
 
 - GitHub [Releases](https://github.com/openmuseai/openmuse/releases)
-- macOS: `DSH Office.app`（`pack-macos-client.sh`）
+- macOS: `OpenMuse.app`（`pack-macos-client.sh`；名称见 `brand/config.yaml`）
 - Windows: zip / Inno 安装包（[`doc/packaging-windows.md`](doc/packaging-windows.md)）
-- Android / iOS: packages from Releases or local `dist/`
+- Android：[`doc/android/README.md`](doc/android/README.md)（`pack-android-client.py` → 真机验证 → `push-android-client.py`）
+- iOS: packages from Releases or local `dist/`
 
 ## Security
 

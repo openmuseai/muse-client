@@ -214,7 +214,7 @@ script_runner = "@duckscript"
 
 # The following tasks will create an archive that will be used on the GitHub Releases section
 # The archives are created using different compression programs depending on the target OS
-# The archive will be composed of all files that are located in the /Release/DSH Office directory
+# The archive will be composed of all files that are located in the /Release/Muse directory
 [tasks.create-release-archive]
 mac_alias = "create-release-archive-macos"
 windows_alias = "create-release-archive-windows"

@@ -6,7 +6,7 @@
         {
           "type": "text",
           "attributes": { "subtype": "heading", "heading": "h1" },
-          "delta": [{ "insert": "Welcome to DSH Office!" }]
+          "delta": [{ "insert": "Welcome to OpenMuse!" }]
         },
         {
           "type": "text",
@@ -200,7 +200,7 @@
             {
               "type": "text",
               "attributes": { "subtype": "heading", "heading": "h2" },
-              "delta": [{ "insert": "Like DSH Office? Follow us:" }]
+              "delta": [{ "insert": "Like OpenMuse? Follow us:" }]
             },
             {
               "type": "text",

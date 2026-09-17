@@ -2,7 +2,7 @@ app-id: com.openmuseai.dshoffice
 runtime: org.freedesktop.Platform
 runtime-version: '21.08'
 sdk: org.freedesktop.Sdk
-command: dsh-office
+command: muse
 separate-locales: false
 finish-args:
   - --share=ipc
@@ -17,11 +17,11 @@ modules:
     buildsystem: simple
     build-commands:
       # - ls .
-      - cp -r dsh-office /app/dsh-office
-      - chmod +x /app/dsh-office/dsh-office
+      - cp -r dsh-office /app/muse
+      - chmod +x /app/muse/muse
       - install -Dm644 logo.svg /app/share/icons/hicolor/scalable/apps/com.openmuseai.dshoffice.svg
       - mkdir /app/bin
-      - ln -s /app/dsh-office/dsh-office /app/bin/dsh-office
+      - ln -s /app/muse/muse /app/bin/muse
       - install -Dm644 com.openmuseai.dshoffice.desktop /app/share/applications/com.openmuseai.dshoffice.desktop
     sources:
       - type: archive

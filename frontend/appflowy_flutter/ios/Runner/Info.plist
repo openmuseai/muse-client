@@ -13,13 +13,15 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleLocalizations</key>
-	<array>
-		<string>en</string>
-	</array>
-	<key>CFBundleName</key>
-	<string>DSH Office</string>
-	<key>CFBundleDisplayName</key>
-	<string>DSH Office</string>
+		<array>
+			<string>en</string>
+			<string>zh-Hans</string>
+			<string>zh-Hant</string>
+		</array>
+		<key>CFBundleName</key>
+		<string>OpenMuse</string>
+		<key>CFBundleDisplayName</key>
+		<string>OpenMuse</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -33,6 +35,7 @@
 			<string></string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>openmuse</string>
 				<string>appflowy-flutter</string>
 			</array>
 		</dict>
@@ -49,16 +52,15 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>OpenMuseai needs access to your camera to let you add images to your documents from
-			camera</string>
+	<string>OpenMuse needs access to your camera to let you add images to your documents from the camera.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>DSH Office needs the microphone so DSH can turn speech into draft text. Audio stays on the device and is never sent automatically.</string>
+	<string>OpenMuse needs the microphone so DSH can turn speech into draft text. Audio stays on the device and is never sent automatically.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>OpenMuseai needs access to your photos to let you add images to your photo library</string>
+	<string>OpenMuse needs access to your photos to let you add images to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>OpenMuseai needs access to your photos to let you add images to your documents</string>
+	<string>OpenMuse needs access to your photos to let you add images to your documents.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>OpenMuseai uses speech recognition only to fill the DSH draft. Nothing is submitted until you tap send.</string>
+	<string>OpenMuse uses speech recognition only to fill the DSH draft. Nothing is submitted until you tap send.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

@@ -34,6 +34,7 @@
 				<string></string>
 				<key>CFBundleURLSchemes</key>
 				<array>
+					<string>openmuse</string>
 					<string>appflowy-flutter</string>
 				</array>
 			</dict>

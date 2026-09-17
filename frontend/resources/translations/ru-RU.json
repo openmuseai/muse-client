@@ -1,5 +1,5 @@
 {
-  "appName": "DSH Office",
+  "appName": "OpenMuse",
   "defaultUsername": "Я",
   "welcomeText": "Добро пожаловать в @:appName",
   "welcomeTo": "Добро пожаловать в",
@@ -37,7 +37,7 @@
     "loginStartWithAnonymous": "Продолжить в анонимной сессии",
     "continueAnonymousUser": "Продолжить в анонимной сессии",
     "continueWithLocalModel": "Продолжить с локальной моделью",
-    "switchToAppFlowyCloud": "AppFlowy Cloud",
+    "switchToAppFlowyCloud": "OpenMuse Cloud",
     "anonymousMode": "Анонимный режим",
     "buttonText": "Войти",
     "signingInText": "Выполняется вход...",
@@ -134,14 +134,14 @@
     "csv": "CSV",
     "copyLink": "Скопировать ссылку",
     "publishToTheWeb": "Опубликовать в Интернете",
-    "publishToTheWebHint": "Создать сайт с помощью AppFlowy",
+    "publishToTheWebHint": "Создать сайт с помощью OpenMuse",
     "publish": "Опубликовать",
     "unPublish": "Снять с публикации",
     "visitSite": "Посетить сайт",
     "exportAsTab": "Экспортировать как",
     "publishTab": "Опубликовать",
     "shareTab": "Поделиться",
-    "publishOnAppFlowy": "Опубликовать на AppFlowy",
+    "publishOnAppFlowy": "Опубликовать на OpenMuse",
     "shareTabTitle": "Пригласить к совместной работе",
     "shareTabDescription": "Для простой совместной работы с кем угодно",
     "copyLinkSuccess": "Ссылка скопирована в буфер обмена",
@@ -214,7 +214,7 @@
     "newChat": "AI Чат",
     "inputMessageHint": "Спросить AI @:appName",
     "inputLocalAIMessageHint": "Спросить локальный AI @:appName",
-    "unsupportedCloudPrompt": "Эта функция доступна только при использовании AppFlowy Cloud",
+    "unsupportedCloudPrompt": "Эта функция доступна только при использовании OpenMuse Cloud",
     "relatedQuestion": "Предложенные",
     "serverUnavailable": "Соединение потеряно. Пожалуйста, проверьте интернет и",
     "aiServerUnavailable": "Служба AI временно недоступна. Пожалуйста, попробуйте позже.",
@@ -863,8 +863,8 @@
       "menuLabel": "Настройки AI",
       "keys": {
         "enableAISearchTitle": "Поиск AI",
-        "aiSettingsDescription": "Выберите предпочтительную модель для работы AppFlowy AI. Включает GPT-4o, GPT-o3-mini, DeepSeek R1, Claude 3.5 Sonnet и модели, доступные в Ollama",
-        "loginToEnableAIFeature": "Функции AI включены только после входа с AppFlowy Cloud. Если у вас нет учетной записи AppFlowy, перейдите в 'Мой аккаунт' для регистрации",
+        "aiSettingsDescription": "Выберите предпочтительную модель для работы OpenMuse. Включает GPT-4o, GPT-o3-mini, DeepSeek R1, Claude 3.5 Sonnet и модели, доступные в Ollama",
+        "loginToEnableAIFeature": "Функции AI включены только после входа с OpenMuse Cloud. Если у вас нет учетной записи OpenMuse, перейдите в 'Мой аккаунт' для регистрации",
         "llmModel": "Языковая модель",
         "llmModelType": "Тип языковой модели",
         "downloadLLMPrompt": "Загрузить {}",
@@ -887,12 +887,12 @@
         "restartLocalAI": "Перезапустить",
         "disableLocalAITitle": "Отключить локальный AI",
         "disableLocalAIDescription": "Вы хотите отключить локальный AI?",
-        "localAIToggleTitle": "AppFlowy Локальный AI (LAI)",
-        "localAIToggleSubTitle": "Запускайте самые продвинутые локальные модели AI в AppFlowy для максимальной конфиденциальности и безопасности",
+        "localAIToggleTitle": "OpenMuse Локальный AI (LAI)",
+        "localAIToggleSubTitle": "Запускайте самые продвинутые локальные модели AI в OpenMuse для максимальной конфиденциальности и безопасности",
         "offlineAIInstruction1": "Следуйте",
         "offlineAIInstruction2": "инструкции",
         "offlineAIInstruction3": "чтобы включить офлайн-AI.",
-        "offlineAIDownload1": "Если вы еще не скачали AppFlowy AI, пожалуйста, ",
+        "offlineAIDownload1": "Если вы еще не скачали OpenMuse, пожалуйста, ",
         "offlineAIDownload2": "скачайте",
         "offlineAIDownload3": "его сначала",
         "activeOfflineAI": "Активно",
@@ -902,7 +902,7 @@
         "ollamaNotReady": "Сервер Ollama не готов.",
         "pleaseFollowThese": "Пожалуйста, следуйте этим",
         "instructions": "инструкциям",
-        "installOllamaLai": "для настройки Ollama и AppFlowy Local AI.",
+        "installOllamaLai": "для настройки Ollama и OpenMuse Local AI.",
         "modelsMissing": "Не удалось найти необходимые модели: ",
         "downloadModel": "чтобы скачать их."
       }
@@ -967,7 +967,7 @@
         "deal": {
           "bannerLabel": "Предложение Нового года!",
           "title": "Развивайте свою команду!",
-          "info": "Обновитесь и сэкономьте 10% на планах Pro и Team! Повысьте продуктивность своего рабочего пространства с помощью новых мощных функций, включая AppFlowy AI.",
+          "info": "Обновитесь и сэкономьте 10% на планах Pro и Team! Повысьте продуктивность своего рабочего пространства с помощью новых мощных функций, включая OpenMuse.",
           "viewPlans": "Посмотреть планы"
         }
       }
@@ -1078,7 +1078,7 @@
       },
       "paymentSuccess": {
         "title": "Вы теперь на плане {}!",
-        "description": "Ваш платеж успешно обработан, и ваш план обновлен до AppFlowy {}. Вы можете просмотреть детали вашего плана на странице Плана"
+        "description": "Ваш платеж успешно обработан, и ваш план обновлен до OpenMuse {}. Вы можете просмотреть детали вашего плана на странице Плана"
       },
       "downgradeDialog": {
         "title": "Вы уверены, что хотите понизить план?",
@@ -1150,8 +1150,8 @@
       "cloudServerType": "Тип облачного сервера",
       "cloudServerTypeTip": "Обратите внимание, что после смены облачного сервера может потребоваться выход из текущей учетной записи",
       "cloudLocal": "Локальный",
-      "cloudAppFlowy": "AppFlowy Cloud",
-      "cloudAppFlowySelfHost": "AppFlowy Cloud Self-hosted",
+      "cloudAppFlowy": "OpenMuse Cloud",
+      "cloudAppFlowySelfHost": "OpenMuse Cloud Self-hosted",
       "appFlowyCloudUrlCanNotBeEmpty": "URL облака не может быть пустым",
       "clickToCopy": "Скопировать в буфер обмена",
       "selfHostStart": "Если у вас нет сервера, пожалуйста, обратитесь к",
@@ -1178,7 +1178,7 @@
       "customPathPrompt": "Хранение папки данных @:appName в облачной синхронизируемой папке, такой как Google Drive, может представлять риски. Если доступ к базе данных в этой папке или ее изменение осуществляется из нескольких мест одновременно, это может привести к конфликтам синхронизации и потенциальному повреждению данных.",
       "importAppFlowyData": "Импорт данных из внешней папки @:appName",
       "importingAppFlowyDataTip": "Идет импорт данных. Пожалуйста, не закрывайте приложение",
-      "importAppFlowyDataDescription": "Копирование данных из внешней папки данных @:appName и импорт их в текущую папку данных AppFlowy",
+      "importAppFlowyDataDescription": "Копирование данных из внешней папки данных @:appName и импорт их в текущую папку данных OpenMuse",
       "importSuccess": "Папка данных @:appName успешно импортирована",
       "importFailed": "Не удалось импортировать папку данных @:appName",
       "importGuide": "Для получения более подробной информации, пожалуйста, ознакомьтесь с указанным документом"
@@ -2879,7 +2879,7 @@
     "reportPage": "Пожаловаться на страницу",
     "databaseHasNotBeenPublished": "Публикация базы данных пока не поддерживается.",
     "createdWith": "Создано с помощью",
-    "downloadApp": "Скачать AppFlowy",
+    "downloadApp": "Скачать OpenMuse",
     "copy": {
       "codeBlock": "Содержимое блока кода скопировано в буфер обмена",
       "imageBlock": "Ссылка на изображение скопирована в буфер обмена",
@@ -2892,7 +2892,7 @@
     "publishFailed": "Не удалось опубликовать",
     "unpublishFailed": "Не удалось снять с публикации",
     "noAccessToVisit": "Нет доступа к этой странице...",
-    "createWithAppFlowy": "Создать сайт с помощью AppFlowy",
+    "createWithAppFlowy": "Создать сайт с помощью OpenMuse",
     "fastWithAI": "Быстро и легко с помощью AI.",
     "tryItNow": "Попробуйте сейчас",
     "onlyGridViewCanBePublished": "Может быть опубликован только вид Таблица",
@@ -2910,7 +2910,7 @@
     "selectWorkspace": "Выберите рабочее пространство",
     "addTo": "Добавить в",
     "duplicateSuccessfully": "Добавлено в ваше рабочее пространство",
-    "duplicateSuccessfullyDescription": "Не установлен AppFlowy? Загрузка начнется автоматически после нажатия 'Скачать'.",
+    "duplicateSuccessfullyDescription": "Не установлен OpenMuse? Загрузка начнется автоматически после нажатия 'Скачать'.",
     "downloadIt": "Скачать",
     "openApp": "Открыть в приложении",
     "duplicateFailed": "Дублирование не удалось",
@@ -3093,7 +3093,7 @@
     "joinWorkspace": "Присоединиться к рабочему пространству",
     "success": "Вы успешно присоединились к рабочему пространству",
     "successMessage": "Теперь у вас есть доступ ко всем страницам и рабочим пространствам в нем.",
-    "openWorkspace": "Открыть AppFlowy",
+    "openWorkspace": "Открыть OpenMuse",
     "alreadyAccepted": "Вы уже приняли приглашение",
     "errorModal": {
       "title": "Что-то пошло не так",
@@ -3119,7 +3119,7 @@
     "title": "Одобрить запрос на присоединение к рабочему пространству",
     "requestSummary": "<user/> запрашивает присоединение к <workspace/> и доступ к <page/>",
     "upgrade": "обновиться",
-    "downloadApp": "Скачать AppFlowy",
+    "downloadApp": "Скачать OpenMuse",
     "approveButton": "Одобрить",
     "approveSuccess": "Успешно одобрено",
     "approveError": "Не удалось одобрить, убедитесь, что лимит плана рабочего пространства не превышен",
@@ -3140,7 +3140,7 @@
   "upgradePlanModal": {
     "title": "Обновиться до Pro",
     "message": "{name} достиг бесплатного лимита участников. Обновитесь до плана Pro, чтобы пригласить больше участников.",
-    "upgradeSteps": "Как обновить план в AppFlowy:",
+    "upgradeSteps": "Как обновить план в OpenMuse:",
     "step1": "1. Перейдите в Настройки",
     "step2": "2. Нажмите на 'План'",
     "step3": "3. Выберите 'Изменить план'",
@@ -3275,11 +3275,11 @@
     "cancelPlan": {
       "title": "Жаль видеть, что вы уходите",
       "success": "Ваша подписка успешно отменена",
-      "description": "Нам жаль, что вы уходите. Мы будем рады услышать ваш отзыв, чтобы помочь нам улучшить AppFlowy. Пожалуйста, уделите минутку, чтобы ответить на несколько вопросов.",
+      "description": "Нам жаль, что вы уходите. Мы будем рады услышать ваш отзыв, чтобы помочь нам улучшить OpenMuse. Пожалуйста, уделите минутку, чтобы ответить на несколько вопросов.",
       "commonOther": "Другое",
       "otherHint": "Напишите свой ответ здесь",
       "questionOne": {
-        "question": "Что побудило вас отменить подписку на AppFlowy Pro?",
+        "question": "Что побудило вас отменить подписку на OpenMuse Pro?",
         "answerOne": "Слишком высокая стоимость",
         "answerTwo": "Функции не соответствовали ожиданиям",
         "answerThree": "Нашел лучшую альтернативу",
@@ -3287,7 +3287,7 @@
         "answerFive": "Проблема с сервисом или технические трудности"
       },
       "questionTwo": {
-        "question": "Насколько вероятно, что вы рассмотрите возможность повторной подписки на AppFlowy Pro в будущем?",
+        "question": "Насколько вероятно, что вы рассмотрите возможность повторной подписки на OpenMuse Pro в будущем?",
         "answerOne": "Очень вероятно",
         "answerTwo": "Несколько вероятно",
         "answerThree": "Не уверен",
@@ -3302,7 +3302,7 @@
         "answerFour": "Доступ к локальным моделям AI"
       },
       "questionFour": {
-        "question": "Как бы вы описали свой общий опыт использования AppFlowy?",
+        "question": "Как бы вы описали свой общий опыт использования OpenMuse?",
         "answerOne": "Отлично",
         "answerTwo": "Хорошо",
         "answerThree": "Средне",

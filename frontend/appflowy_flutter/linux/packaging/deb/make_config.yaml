@@ -1,12 +1,12 @@
-display_name: AppFlowy
+display_name: OpenMuse
 package_name: appflowy
 
 maintainer:
-  name: AppFlowy
+  name: OpenMuseAI
   email: https://github.com/openmuseai/openmuse/issues
 
 keywords:
-  - AppFlowy
+  - OpenMuse
   - Office
   - Document
   - Database
@@ -17,7 +17,7 @@ keywords:
 installed_size: 100000
 icon: linux/packaging/assets/logo.png
 
-generic_name: AppFlowy
+generic_name: OpenMuse
 
 categories:
   - Office

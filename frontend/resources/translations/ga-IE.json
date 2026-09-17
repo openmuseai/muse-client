@@ -1,5 +1,5 @@
 {
-  "appName": "Appflowy",
+  "appName": "OpenMuse",
   "defaultUsername": "Liom",
   "welcomeText": "Fáilte go @:appName",
   "welcomeTo": "Fáilte chuig",
@@ -100,7 +100,7 @@
     "csv": "CSV",
     "copyLink": "Cóipeáil nasc",
     "publishToTheWeb": "Foilsigh don Ghréasán",
-    "publishToTheWebHint": "Cruthaigh suíomh Gréasáin le AppFlowy",
+    "publishToTheWebHint": "Cruthaigh suíomh Gréasáin le OpenMuse",
     "publish": "Foilsigh",
     "unPublish": "Dífhoilsiú",
     "visitSite": "Tabhair cuairt ar an suíomh",

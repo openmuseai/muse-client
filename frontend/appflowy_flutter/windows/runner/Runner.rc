@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "openmuseai" "\0"
-            VALUE "FileDescription", "DSH Office" "\0"
+            VALUE "FileDescription", "OpenMuse" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "DSH Office" "\0"
+            VALUE "InternalName", "OpenMuse" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 OpenMuseAI contributors. All rights reserved." "\0"
-            VALUE "OriginalFilename", "dsh-office.exe" "\0"
-            VALUE "ProductName", "DSH Office" "\0"
+            VALUE "OriginalFilename", "OpenMuse.exe" "\0"
+            VALUE "ProductName", "OpenMuse" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -9,7 +9,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command)
 {
   HANDLE hMutexInstance = CreateMutex(NULL, TRUE, L"DSHOfficeMutex");
-  HWND handle = FindWindowA(NULL, "DSH Office");
+  HWND handle = FindWindowA(NULL, "OpenMuse");
 
   if (GetLastError() == ERROR_ALREADY_EXISTS)
   {
@@ -17,7 +17,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     std::vector<std::string> command_line_arguments = GetCommandLineArguments();
     project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
     FlutterWindow window(project);
-    if (window.SendAppLinkToInstance(L"DSH Office"))
+    if (window.SendAppLinkToInstance(L"OpenMuse"))
     {
       return false;
     }
@@ -49,7 +49,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
 
-  if (!window.Create(L"DSH Office", origin, size))
+  if (!window.Create(L"OpenMuse", origin, size))
   {
     return EXIT_FAILURE;
   }

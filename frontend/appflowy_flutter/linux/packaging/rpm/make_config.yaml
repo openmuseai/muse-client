@@ -1,4 +1,4 @@
-display_name: DSH Office
+display_name: OpenMuse
 icon: linux/packaging/assets/logo.png
 group: Applications/Office
 vendor: OpenMuseAI
@@ -10,7 +10,7 @@ url: https://github.com/openmuseai/openmuse
 build_arch: x86_64
 
 keywords:
-  - DSH Office
+  - OpenMuse
   - Office
   - Document
   - Database
@@ -18,7 +18,7 @@ keywords:
   - Kanban
   - AI
 
-generic_name: DSH Office
+generic_name: OpenMuse
 
 categories:
   - Office

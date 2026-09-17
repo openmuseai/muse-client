@@ -75,11 +75,11 @@ RUN groupadd --gid $gid $user
 RUN useradd --create-home --uid $uid --gid $gid $user
 USER $user
 
-# Set up the DSH Office app
+# Set up the Muse app
 WORKDIR /home/$user
 COPY --from=builder /appflowy/frontend/appflowy_flutter/build/linux/x64/release/bundle .
 RUN xdg-user-dirs-update && \
-    test -e ./dsh-office && \
-    file ./dsh-office
+    test -e ./openmuse && \
+    file ./openmuse
 
-CMD ["./dsh-office"]
+CMD ["./openmuse"]

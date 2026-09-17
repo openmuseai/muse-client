@@ -1,5 +1,5 @@
 {
-  "appName": "DSH Office",
+  "appName": "OpenMuse",
   "defaultUsername": "Moi",
   "welcomeText": "Bienvenue sur @:appName",
   "welcomeTo": "Bienvenue à",
@@ -121,14 +121,14 @@
     "csv": "CSV",
     "copyLink": "Copier le lien",
     "publishToTheWeb": "Publier sur le Web",
-    "publishToTheWebHint": "Créer un site Internet avec AppFlowy",
+    "publishToTheWebHint": "Créer un site Internet avec OpenMuse",
     "publish": "Partager",
     "unPublish": "Annuler la publication",
     "visitSite": "Visitez le site",
     "exportAsTab": "Exporter en tant que",
     "publishTab": "Partager",
     "shareTab": "Partager",
-    "publishOnAppFlowy": "Partager sur AppFlowy"
+    "publishOnAppFlowy": "Partager sur OpenMuse"
   },
   "moreAction": {
     "small": "petit",
