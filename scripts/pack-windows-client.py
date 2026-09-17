@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a distributable Windows DSH Office + DSH client.
+"""Build a distributable Windows Muse + DSH client.
 
 Usage:
   python frontend/client/scripts/pack-windows-client.py
@@ -7,9 +7,9 @@ Usage:
   python frontend/client/scripts/pack-windows-client.py --debug --skip-app-build --skip-packages
 
 Output:
-  dist/windows/DSH Office/
-  dist/windows/DSH-Office-windows-x64.zip
-  dist/windows/DSH-Office-windows-x64-setup.exe  (if Inno Setup is installed)
+  dist/windows/Muse/
+  dist/windows/Muse-windows-x64.zip
+  dist/windows/Muse-windows-x64-setup.exe  (if Inno Setup is installed)
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
 import muse_windows as mw  # noqa: E402
+from brand_config import load_brand_config  # noqa: E402
 
 
 def overlay_flutter_product(product_dir: Path, portable: Path) -> None:
@@ -86,7 +87,8 @@ def main() -> int:
     frontend = mw.frontend_dir(root)
     flutter_app = mw.flutter_dir(root)
     out = mw.dist_dir(root) / "windows"
-    portable = out / "DSH Office"
+    brand = load_brand_config()
+    portable = out / brand.binary_windows
     out.mkdir(parents=True, exist_ok=True)
 
     if not args.skip_packages:
@@ -104,15 +106,19 @@ def main() -> int:
         core_task = "appflowy-core-release"
 
     if not args.skip_app_build:
-        print(f"==> Building DSH Office Windows ({profile}, {build_flag})", flush=True)
+        print(f"==> Building {brand.name_en} Windows ({profile}, {build_flag})", flush=True)
         if not args.skip_core_build:
             mw.run_vs(f"cargo make --profile {profile} {core_task}", cwd=frontend)
         else:
             print("==> Skipping cargo-make (reusing dart_ffi)", flush=True)
         mw.run_vs("call flutter pub get", cwd=flutter_app)
-        mw.run_vs(f"call flutter build windows --{build_flag}", cwd=flutter_app)
+        win_cmd = f"call flutter build windows --{build_flag}"
+        defines = mw.prepare_cloud_dart_defines(debug=args.debug, root=root)
+        if defines:
+            win_cmd += " " + " ".join(defines)
+        mw.run_vs(win_cmd, cwd=flutter_app)
 
-    exe = product_dir / "dsh-office.exe"
+    exe = product_dir / brand.windows_exe
     if not exe.is_file():
         raise FileNotFoundError(
             f"expected app missing: {exe}. Build it first or omit --skip-app-build."
@@ -169,9 +175,10 @@ def main() -> int:
         else:
             mw.stage_dsh_runtime(muse_res, root)
 
+    mw.stage_vendored_dsh_plugins(muse_res, root)
     mw.assert_packed_runtime(muse_res)
 
-    zip_path = out / "DSH-Office-windows-x64.zip"
+    zip_path = out / f"{brand.artifact_prefix}-windows-x64.zip"
     if not args.skip_zip:
         print(f"==> Zipping {zip_path}", flush=True)
         mw.zip_folder(portable, zip_path)
@@ -193,7 +200,7 @@ def main() -> int:
             if icon_src.is_file():
                 shutil.copy2(icon_src, out / "flowy_logo.ico")
             print(f"==> Building installer with {iscc}", flush=True)
-            setup_name = "DSH-Office-windows-x64-setup"
+            setup_name = f"{brand.artifact_prefix}-windows-x64-setup"
             mw.run(
                 [
                     str(iscc),
@@ -213,7 +220,7 @@ def main() -> int:
     print("Distributable client:")
     print(f"  {portable}")
     print(f"  {zip_path}")
-    print("Install: unzip and run dsh-office.exe, or run the setup.exe if built.")
+    print(f"Install: unzip and run {brand.windows_exe}, or run the setup.exe if built.")
     print("First launch: enter DEEPSEEK_API_KEY in the DeepSeek panel.")
     return 0
 

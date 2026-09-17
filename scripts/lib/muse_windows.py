@@ -23,8 +23,22 @@ DSHMARKET_SPEC = os.environ.get("MUSE_DSHMARKET_SPEC", "dshmarket@1.31.1")
 # Bundled pnpm for one-click plugin installs; mirrors the version DSH Desktop pins.
 PNPM_SPEC = os.environ.get("MUSE_PNPM_SPEC", "pnpm@10.34.5")
 
+# Vendored upstream plugins that the composition patch mounts by bare name
+# (`name: dsh-model-capabilities`, see @muse/dsh-appflowy/cordis.patch.yml) and
+# that ship a prebuilt `lib/` (no build step). The Loader resolves bare names
+# from the profile node_modules, so this package must (a) exist in the packed
+# closure and (b) be seeded by DshSidecar.seedClosurePlugins.
+VENDORED_PLUGIN_DIRS = (
+    ("plugins/dsh-model-capabilities", "dsh-model-capabilities"),
+)
+
 PACKAGE_DIRS = (
     ("core/protocol/host-bridge", "host-bridge"),
+    ("core/contract-resource", "contract-resource"),
+    ("core/contract-presentation", "contract-presentation"),
+    ("core/contract-engine-session", "contract-engine-session"),
+    ("core/resource-host", "resource-host"),
+    ("core/dsh-resource-presentation", "dsh-resource-presentation"),
     ("core/plugin-facets", "plugin-facets"),
     ("core/plugin-kit", "plugin-kit"),
     ("core/plugin-graph", "plugin-graph"),
@@ -32,6 +46,9 @@ PACKAGE_DIRS = (
     ("core/contract-document", "contract-document"),
     ("plugins/appflowy-view-reference", "plugin-appflowy-view-reference"),
     ("plugins/appflowy-view-rename", "plugin-appflowy-view-rename"),
+    ("plugins/dsh-resource-presentation-host", "dsh-resource-presentation-host"),
+    ("plugins/dsh-client-ui-resource-open", "dsh-client-ui-resource-open"),
+    ("plugins/dsh-tool-resource-present", "dsh-tool-resource-present"),
     ("plugins/appflowy-markdown", "plugin-appflowy-markdown"),
     ("plugins/appflowy-workspace", "plugin-appflowy-workspace"),
     ("plugins/dsh-mobile-surface", "dsh-mobile-surface"),
@@ -188,6 +205,7 @@ def flutter_home() -> Path:
     env = os.environ.get("FLUTTER_HOME", "").strip()
     if env:
         candidates.append(Path(env).expanduser())
+    candidates.append(Path.home() / "sdks" / "flutters" / "flutter")
     candidates.append(Path(r"D:\muse\flutter-3.27.4"))
     flutter = which("flutter")
     if flutter:
@@ -222,7 +240,7 @@ def require_flutter_327() -> None:
         version = (out.stdout or out.stderr).splitlines()[0] if (out.stdout or out.stderr) else ""
     if "3.27." not in version:
         raise RuntimeError(
-            f"Windows packs need Flutter 3.27.x; got: {version or 'unknown'} "
+            f"Desktop packs need Flutter 3.27.x; got: {version or 'unknown'} "
             f"from {home}. Set FLUTTER_HOME."
         )
     print(f"Flutter: {version} ({home})", flush=True)
@@ -599,6 +617,35 @@ def stage_dshmarket(harness: Path) -> None:
     print(f"Staged dshmarket {version} at {dest}", flush=True)
 
 
+def stage_vendored_dsh_plugins(muse_dir: Path, root: Path | None = None) -> None:
+    """Copy vendored bare-name plugins into the packed runtime node_modules.
+
+    Mirrors middlewares/scripts/stage-dsh-runtime.sh for the packed layouts:
+    patch.yml mounts these plugins by id/name, so each one has to sit where the
+    Loader — and DshSidecar.seedClosurePlugins, which only seeds `dshmarket` plus
+    the `@muse/*` scope — can resolve them. Fresh closure builds already install
+    them through build-muse-closure.py; this keeps `--reuse-runtime` packs and
+    legacy `dsh/` layouts in sync instead of silently dropping the row.
+    """
+    root = root or find_muse_root()
+    targets = (
+        muse_dir / "closure" / "node_modules",
+        muse_dir / "dsh" / "node_modules",
+    )
+    for rel, name in VENDORED_PLUGIN_DIRS:
+        src = packages_root(root) / Path(*rel.split("/"))
+        if not (src / "package.json").is_file():
+            raise FileNotFoundError(f"vendored plugin missing at {src}")
+        for target in targets:
+            if not target.is_dir():
+                continue
+            dest = target / name
+            if dest.exists():
+                rmtree_nofollow(dest)
+            copy_tree(src, dest, exclude_names=("node_modules", ".git"))
+            print(f"Staged vendored plugin {name} at {dest}", flush=True)
+
+
 def _pnpm_version() -> str:
     return PNPM_SPEC.rsplit("@", 1)[-1]
 
@@ -665,6 +712,66 @@ def looks_like_legacy_runtime(muse_dir: Path) -> bool:
     return (muse_dir / "dsh" / "apps" / "cli" / "src" / "bin.ts").is_file()
 
 
+def node_arch_tag() -> str:
+    machine = os.uname().machine if hasattr(os, "uname") else ""
+    if sys.platform == "darwin":
+        return "arm64" if machine == "arm64" else "x64"
+    if sys.platform.startswith("linux"):
+        return "arm64" if machine in {"aarch64", "arm64"} else "x64"
+    return "x64"
+
+
+def bundled_node_bin(muse_dir: Path) -> Path:
+    """Official Node tarball uses `bin/node`; the Windows zip uses `node.exe`."""
+    for rel in ("node/bin/node", "node/bin/node.exe", "node/node.exe"):
+        candidate = muse_dir / Path(*rel.split("/"))
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(f"bundled Node binary missing under {muse_dir / 'node'}")
+
+
+def stage_bundled_node_unix(destination: Path, *, node: Path | None = None) -> Path:
+    """Place official `bin/node` at `{destination}/node/bin/node`."""
+    node_dir = destination / "node"
+    dest = node_dir / "bin" / "node"
+    if node is not None and Path(node).is_file():
+        src = Path(node)
+    elif dest.is_file():
+        src = dest
+    else:
+        arch = node_arch_tag()
+        name = f"node-v{NODE_VERSION}-darwin-{arch}" if sys.platform == "darwin" else f"node-v{NODE_VERSION}-linux-{arch}"
+        cache = dist_dir() / "cache"
+        cache.mkdir(parents=True, exist_ok=True)
+        archive = cache / f"{name}.tar.gz"
+        if not archive.is_file():
+            _download(f"https://nodejs.org/dist/v{NODE_VERSION}/{name}.tar.gz", archive)
+        extracted = cache / f"{name}-extracted"
+        if not (extracted / "bin" / "node").is_file():
+            if extracted.exists():
+                rmtree_nofollow(extracted)
+            extracted.mkdir(parents=True)
+            with tarfile.open(archive, "r:gz") as tar:
+                try:
+                    tar.extractall(extracted, filter="data")
+                except TypeError:
+                    tar.extractall(extracted)
+            payload = extracted / name
+            if payload.is_dir():
+                for item in payload.iterdir():
+                    shutil.move(str(item), str(extracted / item.name))
+                payload.rmdir()
+        src = extracted / "bin" / "node"
+        if not src.is_file():
+            raise FileNotFoundError(f"Node tarball did not contain bin/node: {archive}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if src.resolve() != dest.resolve():
+        shutil.copy2(src, dest)
+        dest.chmod(dest.stat().st_mode | stat.S_IEXEC)
+    print(f"Staged bundled node at {dest}", flush=True)
+    return dest
+
+
 def stage_bundled_node_exe(destination: Path, *, node: Path | None = None) -> Path:
     """Place `node.exe` (+ `bin/node.exe` alias) at `{destination}/node/`.
 
@@ -691,6 +798,12 @@ def stage_bundled_node_exe(destination: Path, *, node: Path | None = None) -> Pa
     return exe
 
 
+def stage_bundled_node(destination: Path, *, node: Path | None = None) -> Path:
+    if sys.platform == "win32":
+        return stage_bundled_node_exe(destination, node=node)
+    return stage_bundled_node_unix(destination, node=node)
+
+
 def stage_closure(
     source: Path,
     destination: Path,
@@ -707,7 +820,7 @@ def stage_closure(
     + tarballs). Tarballs land in closure-tarballs for first-launch profile installs.
     """
     destination.mkdir(parents=True, exist_ok=True)
-    stage_bundled_node_exe(destination, node=node)
+    stage_bundled_node(destination, node=node)
 
     if not (source / "package.json").is_file():
         raise FileNotFoundError(f"closure source missing package.json: {source}")
@@ -733,14 +846,31 @@ def stage_closure(
     if not patch_src.is_file():
         raise FileNotFoundError(f"missing DSH patch {patch_src}")
     shutil.copy2(patch_src, destination / "patch.yml")
-    (destination / "README.txt").write_text(
-        "Muse bundled DSH runtime (Windows, npm closure).\n\n"
-        "Launched by DSH Office as:\n"
-        "  node closure\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js "
-        "web --patch patch.yml --no-open --host 127.0.0.1 --port 3080\n"
-        "User data lives in %APPDATA%\\DSH Office\\Muse\\\n",
-        encoding="utf-8",
-    )
+    if sys.platform == "darwin":
+        readme = (
+            "OpenMuse bundled DSH runtime (macOS, npm closure).\n\n"
+            "Launched as:\n"
+            "  node closure/node_modules/@deepseek-ai/dsh/lib/bin.js "
+            "web --patch patch.yml --host 127.0.0.1 --port 3080\n"
+            "User data lives in ~/Library/Application Support/OpenMuse/\n"
+        )
+    elif sys.platform == "win32":
+        readme = (
+            "OpenMuse bundled DSH runtime (Windows, npm closure).\n\n"
+            "Launched as:\n"
+            "  node closure\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js "
+            "web --patch patch.yml --host 127.0.0.1 --port 3080\n"
+            "User data lives in %APPDATA%\\OpenMuse\\\n"
+        )
+    else:
+        readme = (
+            "OpenMuse bundled DSH runtime (npm closure).\n\n"
+            "Launched as:\n"
+            "  node closure/node_modules/@deepseek-ai/dsh/lib/bin.js "
+            "web --patch patch.yml --host 127.0.0.1 --port 3080\n"
+        )
+    (destination / "README.txt").write_text(readme, encoding="utf-8")
+    stage_vendored_dsh_plugins(destination)
     print(f"Staged closure layout at {destination} (entry {CLOSURE_ENTRY_REL})", flush=True)
 
 
@@ -836,22 +966,25 @@ def stage_dsh_runtime(destination: Path, root: Path | None = None) -> None:
     print("==> Staging dshmarket", flush=True)
     stage_dshmarket(dsh)
 
+    print("==> Staging vendored plugins (bare-name patch rows)", flush=True)
+    stage_vendored_dsh_plugins(destination, root)
+
     print("==> Staging plugin tools (bundled pnpm + pnpm-runner)", flush=True)
     stage_plugin_tools(destination)
 
     shutil.copy2(patch, destination / "patch.yml")
     (destination / "README.txt").write_text(
         "Muse bundled DSH runtime (Windows).\n\n"
-        "Launched by DSH Office as:\n"
+        "Launched by Muse as:\n"
         "  node --import tsx/esm apps/cli/src/bin.ts --profile web --patch ..\\patch.yml\n"
-        "User data lives in %APPDATA%\\DSH Office\\Muse\\\n",
+        "User data lives in %APPDATA%\\Muse\\\n",
         encoding="utf-8",
     )
     print(f"Staged Muse runtime at {destination}", flush=True)
 
 
 def assert_packed_runtime(muse_dir: Path) -> None:
-    node = muse_dir / "node" / "node.exe"
+    node = bundled_node_bin(muse_dir)
     patch = muse_dir / "patch.yml"
     pnpm_entry = muse_dir / "plugin-tools" / "pnpm" / "bin" / "pnpm.cjs"
     pnpm_runner = muse_dir / "plugin-tools" / "pnpm-runner.mjs"
@@ -864,6 +997,12 @@ def assert_packed_runtime(muse_dir: Path) -> None:
                 muse_dir / "closure" / "node_modules" / "@muse" / "dsh-appflowy" / "package.json",
             ]
         )
+        # patch.yml mounts these by bare name; missing packages mean the row
+        # cannot resolve at boot (see VENDORED_PLUGIN_DIRS).
+        required.extend(
+            muse_dir / "closure" / "node_modules" / name / "package.json"
+            for _rel, name in VENDORED_PLUGIN_DIRS
+        )
         kind = "closure"
     elif looks_like_legacy_runtime(muse_dir):
         required.extend(
@@ -871,6 +1010,10 @@ def assert_packed_runtime(muse_dir: Path) -> None:
                 muse_dir / "dsh" / "apps" / "cli" / "src" / "bin.ts",
                 muse_dir / "dsh" / "node_modules" / "dshmarket" / "lib" / "index.js",
             ]
+        )
+        required.extend(
+            muse_dir / "dsh" / "node_modules" / name / "package.json"
+            for _rel, name in VENDORED_PLUGIN_DIRS
         )
         kind = "legacy"
     else:
@@ -917,6 +1060,34 @@ def pnpm_install(cwd: Path) -> None:
         ],
         cwd=cwd,
     )
+
+
+def prepare_cloud_dart_defines(*, debug: bool = False, root: Path | None = None) -> list[str]:
+    """Pin release desktop builds to the public OpenMuse Cloud endpoints.
+
+    Debug builds keep `.env` localhost so local Cloud still works. Release packs
+    without this talk to `http://localhost:8000` and production passwords fail.
+    """
+    if debug:
+        return []
+    root = root or find_muse_root()
+    src = client_dir(root) / "config" / "openmuse-cloud.json"
+    if not src.is_file():
+        raise FileNotFoundError(f"missing cloud dart-define profile {src}")
+    prepared = dist_dir(root) / "cache" / "openmuse-cloud.dart-define.json"
+    prepared.parent.mkdir(parents=True, exist_ok=True)
+    script = flutter_dir(root) / "tool" / "prepare_mobile_config.dart"
+    dart = which("dart")
+    if dart is None:
+        home = flutter_home()
+        dart = str(home / "bin" / ("dart.bat" if os.name == "nt" else "dart"))
+    completed = run_capture([dart, str(script), str(src)], cwd=flutter_dir(root), check=True)
+    text = (completed.stdout or "").strip()
+    if not text.startswith("{"):
+        raise RuntimeError(f"cloud profile prepare failed: {completed.stderr or text}")
+    prepared.write_text(text + "\n", encoding="utf-8")
+    print(f"==> Cloud dart-defines from {src}", flush=True)
+    return ["--dart-define-from-file", str(prepared)]
 
 
 def build_muse_packages(*, skip_tests: bool = False, root: Path | None = None) -> None:

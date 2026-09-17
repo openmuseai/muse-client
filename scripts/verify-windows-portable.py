@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a packed / installed DSH Office tree is out-of-box ready.
+"""Verify a packed / installed Muse tree is out-of-box ready.
 
 Checks:
   1. Flutter exe + muse closure layout (no source-tree MUSE_ROOT required)
@@ -9,7 +9,7 @@ Checks:
 
 Usage:
   python frontend/client/scripts/verify-windows-portable.py
-  python frontend/client/scripts/verify-windows-portable.py --root "dist/windows/DSH Office"
+  python frontend/client/scripts/verify-windows-portable.py --root "dist/windows/Muse"
   python frontend/client/scripts/verify-windows-portable.py --skip-plugin
 """
 from __future__ import annotations
@@ -28,6 +28,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 
 import muse_windows as mw  # noqa: E402
+from brand_config import load_brand_config  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,7 +37,7 @@ def parse_args() -> argparse.Namespace:
         "--root",
         type=Path,
         default=None,
-        help="Portable or install directory that contains dsh-office.exe + muse/.",
+        help="Portable or install directory that contains the app exe + muse/.",
     )
     parser.add_argument("--port", default="3091")
     parser.add_argument("--skip-boot", action="store_true")
@@ -84,7 +85,7 @@ def _seed_closure_plugins(muse: Path, dsh_home: Path) -> int:
         leaked_host = dest_root / "@deepseek-ai"
         if leaked_host.exists() or leaked_host.is_symlink():
             mw.rmtree_nofollow(leaked_host)
-    roots = ["dshmarket"]
+    roots = ["dshmarket", "dsh-model-capabilities"]
     muse_scope = closure_nm / "@muse"
     if muse_scope.is_dir():
         roots.extend(f"@muse/{entry.name}" for entry in sorted(muse_scope.iterdir()) if entry.is_dir())
@@ -140,7 +141,7 @@ def _http_ready(port: str) -> bool:
 
 
 def _boot(muse: Path, dsh_home: Path, port: str) -> list[str]:
-    node = muse / "node" / "node.exe"
+    node = mw.bundled_node_bin(muse)
     entry = mw.closure_entry(muse)
     patch = muse / "patch.yml"
     env = os.environ.copy()
@@ -157,7 +158,6 @@ def _boot(muse: Path, dsh_home: Path, port: str) -> list[str]:
         "web",
         "--patch",
         str(patch),
-        "--no-open",
         "--host",
         "127.0.0.1",
         "--port",
@@ -198,7 +198,7 @@ def _boot(muse: Path, dsh_home: Path, port: str) -> list[str]:
 
 
 def _plugin_add(muse: Path, dsh_home: Path, package: str) -> None:
-    node = muse / "node" / "node.exe"
+    node = mw.bundled_node_bin(muse)
     entry = mw.closure_entry(muse)
     env = os.environ.copy()
     env["DSH_HOME"] = str(dsh_home)
@@ -228,7 +228,8 @@ def _plugin_add(muse: Path, dsh_home: Path, package: str) -> None:
 
 
 def verify(root: Path, *, port: str, skip_boot: bool, skip_plugin: bool, package: str) -> None:
-    exe = root / "dsh-office.exe"
+    brand = load_brand_config()
+    exe = root / brand.windows_exe
     muse = root / "muse"
     if not exe.is_file():
         raise FileNotFoundError(f"missing {exe}")
@@ -258,9 +259,10 @@ def verify(root: Path, *, port: str, skip_boot: bool, skip_plugin: bool, package
 
 def main() -> int:
     args = parse_args()
+    brand = load_brand_config()
     root = args.root
     if root is None:
-        root = mw.dist_dir() / "windows" / "DSH Office"
+        root = mw.dist_dir() / "windows" / brand.binary_windows
     verify(
         root.resolve(),
         port=args.port,
