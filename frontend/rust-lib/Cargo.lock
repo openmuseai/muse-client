@@ -1633,6 +1633,7 @@ dependencies = [
  "lazy_static",
  "lib-dispatch",
  "lib-log",
+ "muse-diff-text",
  "protobuf",
  "semver",
  "serde",
@@ -2427,6 +2428,7 @@ dependencies = [
  "twox-hash",
  "url",
  "uuid",
+ "zip 2.2.0",
 ]
 
 [[package]]
@@ -4882,6 +4884,14 @@ name = "murmurhash32"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9380db4c04d219ac5c51d14996bbf2c2e9a15229771b53f8671eb6c83cf44df"
+
+[[package]]
+name = "muse-diff-text"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "muse-document-contract"

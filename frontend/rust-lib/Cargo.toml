@@ -31,6 +31,7 @@ members = [
   "flowy-ai-pub",
   "flowy-storage-pub",
   "flowy-sqlite-vec",
+  "muse-diff-text",
 ]
 
 resolver = "2"
@@ -104,6 +105,7 @@ derive_builder = "0.20.2"
 tantivy = { version = "0.24.1" }
 num_enum = "0.7.3"
 flowy-sqlite-vec = { path = "flowy-sqlite-vec" }
+muse-diff-text = { path = "muse-diff-text" }
 
 # Please using the following command to update the revision id
 # Current directory: frontend

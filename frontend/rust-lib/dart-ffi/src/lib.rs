@@ -34,6 +34,7 @@ mod appflowy_yaml;
 mod c;
 mod env_serde;
 mod model;
+mod muse_diff_text_ffi;
 mod notification;
 mod protobuf;
 
