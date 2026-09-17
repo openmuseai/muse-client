@@ -8,6 +8,7 @@ import 'package:appflowy/plugins/base/emoji/emoji_picker_screen.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_mobile_agent_page.dart';
 import 'package:appflowy/shared/icon_emoji_picker/flowy_icon_emoji_picker.dart';
 import 'package:appflowy/shared/icon_emoji_picker/tab.dart';
+import 'package:appflowy/shared/af_user_profile_extension.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/util/built_in_svgs.dart';
 import 'package:appflowy/workspace/application/user/settings_user_bloc.dart';
@@ -65,6 +66,7 @@ class MobileHomePageHeader extends StatelessWidget {
                             accountRef: accountRef,
                             isCloudAccount:
                                 userProfile.userAuthType == AuthTypePB.Server,
+                            accessToken: userProfile.authToken,
                             isCurrentScope: () =>
                                 !workspaceBloc.isClosed &&
                                 workspaceBloc
@@ -112,7 +114,7 @@ class _MobileUser extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const FlowyText.medium('DSH Office', fontSize: 18),
+            FlowyText.medium(LocaleKeys.appName.tr(), fontSize: 18),
               const VSpace(4),
               FlowyText.regular(
                 userProfile.email.isNotEmpty

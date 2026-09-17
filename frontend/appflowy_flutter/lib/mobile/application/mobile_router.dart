@@ -63,7 +63,11 @@ extension on ViewPB {
         return MobileBoardScreen.routeName;
       case ViewLayoutPB.Chat:
         return MobileChatScreen.routeName;
-
+      case ViewLayoutPB.Word:
+      case ViewLayoutPB.Excel:
+      case ViewLayoutPB.Slides:
+      case ViewLayoutPB.Pdf:
+        throw UnimplementedError('Office plugins are desktop-only in this phase');
       default:
         throw UnimplementedError('routeName for $this is not implemented');
     }
@@ -97,6 +101,11 @@ extension on ViewPB {
           MobileChatScreen.viewId: id,
           MobileChatScreen.viewTitle: name,
         };
+      case ViewLayoutPB.Word:
+      case ViewLayoutPB.Excel:
+      case ViewLayoutPB.Slides:
+      case ViewLayoutPB.Pdf:
+        throw UnimplementedError('Office plugins are desktop-only in this phase');
       default:
         throw UnimplementedError(
           'queryParameters for $this is not implemented',

@@ -1,4 +1,4 @@
-import 'package:appflowy/generated/flowy_svgs.g.dart';
+import 'package:appflowy/user/presentation/screens/sign_in_screen/widgets/logo/logo.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/shared/flowy_error_page.dart';
 import 'package:appflowy/workspace/application/workspace/prelude.dart';
@@ -56,11 +56,7 @@ class _MobileWorkspaceStartScreenState
           child: Column(
             children: [
               const Spacer(),
-              const FlowySvg(
-                FlowySvgs.app_logo_xl,
-                size: Size.square(64),
-                blendMode: null,
-              ),
+              const AFLogo(size: Size.square(64)),
               const VSpace(spacing * 2),
               Text(
                 LocaleKeys.workspace_chooseWorkspace.tr(),
