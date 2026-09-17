@@ -4,9 +4,12 @@ import 'dart:io';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/document/application/document_data_pb_extension.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/migration/editor_migration.dart';
+import 'package:appflowy/plugins/office/office.dart';
+import 'package:appflowy/plugins/word/word_backend.dart';
 import 'package:appflowy/shared/markdown_to_document.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/workspace/application/settings/share/import_service.dart';
+import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/import/import_type.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/protobuf.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -140,6 +143,38 @@ class _ImportPanelState extends State<ImportPanel> {
   }
 
   Future<void> _importFile(String parentViewId, ImportType importType) async {
+    if (importType == ImportType.wordDocx) {
+      // Pick first — NSOpenPanel must not sit under a loading overlay, and
+      // must not start in ~/Documents (that directory hangs this machine).
+      final views = await WordBackendService.pickAndImportDocx(
+        parentViewId: parentViewId,
+      );
+      showLoading.value = true;
+      if (views.isNotEmpty && getIt.isRegistered<TabsBloc>()) {
+        getIt<TabsBloc>().openPlugin(views.last);
+      }
+      showLoading.value = false;
+      widget.importCallback(importType, '', null);
+      return;
+    }
+
+    final officeId = importType.officePluginId;
+    if (officeId != null) {
+      OfficePluginCatalog.ensureInstalled();
+      final views = await OfficeBackendService.pickAndImport(
+        parentViewId: parentViewId,
+        manifest: OfficePluginRegistry.instance.mustGet(officeId),
+        allowMultiple: importType.allowMultiSelect,
+      );
+      showLoading.value = true;
+      if (views.isNotEmpty && getIt.isRegistered<TabsBloc>()) {
+        getIt<TabsBloc>().openPlugin(views.last);
+      }
+      showLoading.value = false;
+      widget.importCallback(importType, '', null);
+      return;
+    }
+
     final result = await getIt<FilePickerService>().pickFiles(
       type: FileType.custom,
       allowMultiple: importType.allowMultiSelect,
@@ -203,6 +238,11 @@ class _ImportPanelState extends State<ImportPanel> {
               ..viewLayout = ViewLayoutPB.Grid
               ..importType = ImportTypePB.AFDatabase,
           );
+          break;
+        case ImportType.wordDocx:
+        case ImportType.excelXlsx:
+        case ImportType.slidesPptx:
+        case ImportType.pdfFile:
           break;
       }
     }

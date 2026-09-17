@@ -17,10 +17,12 @@ class SidebarFolder extends StatelessWidget {
   const SidebarFolder({
     super.key,
     this.isHoverEnabled = true,
+    this.includeBottomSpacer = true,
     required this.userProfile,
   });
 
   final bool isHoverEnabled;
+  final bool includeBottomSpacer;
   final UserProfilePB userProfile;
 
   @override
@@ -74,7 +76,7 @@ class SidebarFolder extends StatelessWidget {
                 );
               },
             ),
-            const VSpace(200),
+            if (includeBottomSpacer) const VSpace(200),
           ],
         );
       },

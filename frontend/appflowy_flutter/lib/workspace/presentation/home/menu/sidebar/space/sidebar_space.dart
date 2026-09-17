@@ -25,10 +25,12 @@ class SidebarSpace extends StatelessWidget {
   const SidebarSpace({
     super.key,
     this.isHoverEnabled = true,
+    this.includeBottomSpacer = true,
     required this.userProfile,
   });
 
   final bool isHoverEnabled;
+  final bool includeBottomSpacer;
   final UserProfilePB userProfile;
 
   @override
@@ -81,7 +83,7 @@ class SidebarSpace extends StatelessWidget {
               const _Space(),
             ],
 
-            const VSpace(200),
+            if (includeBottomSpacer) const VSpace(200),
           ],
         ),
       ),

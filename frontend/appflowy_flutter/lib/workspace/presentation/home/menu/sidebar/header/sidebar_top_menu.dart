@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:appflowy/core/frameless_window.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
+import 'package:appflowy/user/presentation/screens/sign_in_screen/widgets/logo/logo.dart';
 import 'package:appflowy/workspace/application/home/home_setting_bloc.dart';
 import 'package:appflowy/workspace/application/menu/sidebar_sections_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
@@ -50,16 +51,22 @@ class SidebarTopMenu extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final svgData = Theme.of(context).brightness == Brightness.dark
-        ? FlowySvgs.app_logo_with_text_dark_xl
-        : FlowySvgs.app_logo_with_text_light_xl;
+    final theme = AppFlowyTheme.of(context);
 
     return Padding(
       padding: const EdgeInsets.only(top: 12.0, left: 8),
-      child: FlowySvg(
-        svgData,
-        size: const Size(92, 17),
-        blendMode: null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AFLogo(size: Size.square(20)),
+          const SizedBox(width: 8),
+          Text(
+            LocaleKeys.appName.tr(),
+            style: theme.textStyle.body.enhanced(
+              color: theme.textColorScheme.primary,
+            ),
+          ),
+        ],
       ),
     );
   }

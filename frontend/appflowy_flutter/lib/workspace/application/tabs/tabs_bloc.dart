@@ -75,7 +75,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
               ..hideSecondaryPlugin()
               ..setSecondaryPlugin(BlankPagePlugin());
             emit(state.openView(plugin));
-            _setLatestOpenView(view);
+            if (view.id.isNotEmpty) _setLatestOpenView(view);
           },
           openPlugin: (Plugin plugin, ViewPB? view, bool setLatest) {
             final now = DateTime.now();
@@ -301,6 +301,16 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       ),
     );
   }
+
+  /// Opens a Host-owned plugin in its own tab without writing an AppFlowy
+  /// database view as the latest view. Used by local files and future external
+  /// resource providers.
+  void openExternalPlugin(Plugin plugin) => add(
+        TabsEvent.openTab(
+          plugin: plugin,
+          view: ViewPB(),
+        ),
+      );
 }
 
 @freezed

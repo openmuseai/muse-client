@@ -737,6 +737,10 @@ class _SingleInnerViewItemState extends State<SingleInnerViewItem> {
     bool createNewView,
   ) {
     final viewBloc = context.read<ViewBloc>();
+    if (!createNewView) {
+      viewBloc.add(const ViewEvent.setIsExpanded(true));
+      return;
+    }
 
     // the name of new document should be empty
     final viewName = ![ViewLayoutPB.Document, ViewLayoutPB.Chat]

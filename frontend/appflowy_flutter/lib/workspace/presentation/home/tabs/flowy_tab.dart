@@ -3,6 +3,7 @@ import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
 import 'package:appflowy/workspace/presentation/home/home_stack.dart';
+import 'package:appflowy/startup/plugin/plugin.dart';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -62,6 +63,7 @@ class _FlowyTabState extends State<FlowyTab> {
               child: TabMenu(
                 controller: controller,
                 pageId: widget.pageManager.plugin.id,
+                plugin: widget.pageManager.plugin,
                 isPinned: widget.pageManager.isPinned,
                 isAllPinned: widget.isAllPinned,
               ),
@@ -97,9 +99,24 @@ class _FlowyTabState extends State<FlowyTab> {
                                 widget.pageManager.isPinned,
                               ),
                             ),
+                            if (widget.pageManager.plugin
+                                is PluginTabMenuContributor)
+                              Visibility(
+                                visible: isHovering || widget.isCurrent,
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 26,
+                                  child: FlowyIconButton(
+                                    tooltipText: 'Tab actions',
+                                    onPressed: controller.show,
+                                    icon:
+                                        const Icon(Icons.more_horiz, size: 17),
+                                  ),
+                                ),
+                              ),
                             if (!widget.pageManager.isPinned) ...[
                               Visibility(
-                                visible: isHovering,
+                                visible: isHovering || widget.isCurrent,
                                 child: SizedBox(
                                   width: 26,
                                   height: 26,
@@ -149,12 +166,14 @@ class TabMenu extends StatelessWidget {
     super.key,
     required this.controller,
     required this.pageId,
+    required this.plugin,
     required this.isPinned,
     required this.isAllPinned,
   });
 
   final PopoverController controller;
   final String pageId;
+  final Plugin plugin;
   final bool isPinned;
   final bool isAllPinned;
 
@@ -192,6 +211,10 @@ class TabMenu extends StatelessWidget {
             ),
           ),
         ),
+        if (plugin case final PluginTabMenuContributor contributor) ...[
+          const Divider(height: 0.5),
+          ..._pluginActions(context, contributor),
+        ],
         const Divider(height: 0.5),
         FlowyButton(
           text: FlowyText.regular(
@@ -203,6 +226,61 @@ class TabMenu extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  List<Widget> _pluginActions(
+    BuildContext context,
+    PluginTabMenuContributor contributor,
+  ) {
+    final actions = contributor.tabMenuActions(context);
+    final widgets = <Widget>[];
+    int? previousGroup;
+    for (final action in actions) {
+      if (previousGroup != null && previousGroup != action.group) {
+        widgets.add(const Divider(height: 0.5));
+      }
+      previousGroup = action.group;
+      widgets.add(
+        Opacity(
+          opacity: action.enabled ? 1 : 0.45,
+          child: action.submenuBuilder == null
+              ? FlowyButton(
+                  leftIcon:
+                      action.icon == null ? null : Icon(action.icon, size: 16),
+                  text: FlowyText.regular(action.label),
+                  disable: !action.enabled,
+                  onTap: () async {
+                    controller.close();
+                    await action.invoke(context);
+                  },
+                )
+              : AppFlowyPopover(
+                  triggerActions:
+                      PopoverTriggerFlags.hover | PopoverTriggerFlags.click,
+                  offset: const Offset(6, 0),
+                  constraints: const BoxConstraints(
+                    minWidth: 240,
+                    maxWidth: 320,
+                    maxHeight: 420,
+                  ),
+                  popupBuilder: (ctx) => action.submenuBuilder!(
+                    ctx,
+                    controller.close,
+                  ),
+                  child: FlowyButton(
+                    leftIcon: action.icon == null
+                        ? null
+                        : Icon(action.icon, size: 16),
+                    rightIcon: const Icon(Icons.chevron_right, size: 16),
+                    text: FlowyText.regular(action.label),
+                    disable: !action.enabled,
+                    onTap: () {},
+                  ),
+                ),
+        ),
+      );
+    }
+    return widgets;
   }
 
   Widget _wrapInTooltip({

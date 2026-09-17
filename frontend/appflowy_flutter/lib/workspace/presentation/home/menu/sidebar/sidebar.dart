@@ -35,6 +35,7 @@ import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/space/sidebar_space.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/space/space_migration.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/workspace/sidebar_workspace.dart';
+import 'package:appflowy/workspace_platform/presentation/workspace_explorer.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/workspace.pb.dart';
@@ -395,7 +396,7 @@ class _SidebarState extends State<_Sidebar> {
               ),
             ),
 
-            _renderFolderOrSpace(menuHorizontalInset),
+            _renderWorkspaceAndKnowledge(menuHorizontalInset),
 
             // trash
             Padding(
@@ -421,7 +422,44 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  Widget _renderFolderOrSpace(EdgeInsets menuHorizontalInset) {
+  Widget _renderWorkspaceAndKnowledge(EdgeInsets menuHorizontalInset) {
+    final workspace = context.read<UserWorkspaceBloc>().state.currentWorkspace;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: menuHorizontalInset,
+              child: FlowyScrollbar(
+                child: SingleChildScrollView(
+                  child: MuseWorkspaceExplorer(
+                    accountSpaceRef: workspace?.workspaceId ?? 'default',
+                    accountSpaceTitle: workspace?.name ?? 'Workspace',
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const VSpace(12),
+          Padding(
+            padding:
+                menuHorizontalInset + const EdgeInsets.symmetric(horizontal: 4),
+            child: const FlowyDivider(),
+          ),
+          const VSpace(8),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.32,
+            ),
+            child: _renderFolderOrSpaceBody(menuHorizontalInset),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _renderFolderOrSpaceBody(EdgeInsets menuHorizontalInset) {
     final spaceState = context.read<SpaceBloc>().state;
     final workspaceState = context.read<UserWorkspaceBloc>().state;
 
@@ -442,34 +480,38 @@ class _SidebarState extends State<_Sidebar> {
     return !containsSpace ||
             spaceState.spaces.isEmpty ||
             !workspaceState.isCollabWorkspaceOn
-        ? Expanded(
-            child: Padding(
-              padding: menuHorizontalInset - const EdgeInsets.only(right: 6),
-              child: SingleChildScrollView(
+        ? Padding(
+            padding: menuHorizontalInset - const EdgeInsets.only(right: 6),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(right: 6),
+              controller: _scrollController,
+              physics: const ClampingScrollPhysics(),
+              children: [
+                SidebarFolder(
+                  userProfile: widget.userProfile,
+                  isHoverEnabled: !_isScrolling,
+                  includeBottomSpacer: false,
+                ),
+              ],
+            ),
+          )
+        : Padding(
+            padding: menuHorizontalInset - const EdgeInsets.only(right: 6),
+            child: FlowyScrollbar(
+              controller: _scrollController,
+              child: ListView(
+                shrinkWrap: true,
                 padding: const EdgeInsets.only(right: 6),
                 controller: _scrollController,
                 physics: const ClampingScrollPhysics(),
-                child: SidebarFolder(
-                  userProfile: widget.userProfile,
-                  isHoverEnabled: !_isScrolling,
-                ),
-              ),
-            ),
-          )
-        : Expanded(
-            child: Padding(
-              padding: menuHorizontalInset - const EdgeInsets.only(right: 6),
-              child: FlowyScrollbar(
-                controller: _scrollController,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(right: 6),
-                  controller: _scrollController,
-                  physics: const ClampingScrollPhysics(),
-                  child: SidebarSpace(
+                children: [
+                  SidebarSpace(
                     userProfile: widget.userProfile,
                     isHoverEnabled: !_isScrolling,
+                    includeBottomSpacer: false,
                   ),
-                ),
+                ],
               ),
             ),
           );

@@ -10,6 +10,10 @@ import 'package:appflowy/plugins/database/grid/presentation/grid_page.dart';
 import 'package:appflowy/plugins/database/grid/presentation/mobile_grid_page.dart';
 import 'package:appflowy/plugins/database/tab_bar/tab_bar_view.dart';
 import 'package:appflowy/plugins/document/document.dart';
+import 'package:appflowy/plugins/office/office_catalog.dart';
+import 'package:appflowy/plugins/office/office_manifest.dart';
+import 'package:appflowy/plugins/office/office_plugin.dart';
+import 'package:appflowy/plugins/word/word.dart';
 import 'package:appflowy/shared/icon_emoji_picker/icon_picker.dart';
 import 'package:appflowy/startup/plugin/plugin.dart';
 import 'package:appflowy/workspace/application/sidebar/space/space_bloc.dart';
@@ -60,6 +64,7 @@ extension MinimalViewExtension on FolderViewMinimalPB {
           ViewLayoutPB.Grid => FlowySvgs.icon_grid_s,
           ViewLayoutPB.Document => FlowySvgs.icon_document_s,
           ViewLayoutPB.Chat => FlowySvgs.chat_ai_page_s,
+          ViewLayoutPB.Word => FlowySvgs.icon_document_s,
           _ => FlowySvgs.icon_document_s,
         },
         size: size,
@@ -84,19 +89,27 @@ extension ViewExtension on ViewPB {
           ViewLayoutPB.Grid => FlowySvgs.icon_grid_s,
           ViewLayoutPB.Document => FlowySvgs.icon_document_s,
           ViewLayoutPB.Chat => FlowySvgs.chat_ai_page_s,
+          ViewLayoutPB.Word => FlowySvgs.icon_document_s,
           _ => FlowySvgs.icon_document_s,
         },
         size: size,
       );
 
-  PluginType get pluginType => switch (layout) {
-        ViewLayoutPB.Board => PluginType.board,
-        ViewLayoutPB.Calendar => PluginType.calendar,
-        ViewLayoutPB.Document => PluginType.document,
-        ViewLayoutPB.Grid => PluginType.grid,
-        ViewLayoutPB.Chat => PluginType.chat,
-        _ => throw UnimplementedError(),
-      };
+  PluginType get pluginType {
+    OfficePluginCatalog.ensureInstalled();
+    final office = OfficePluginRegistry.instance.byLayout(layout);
+    if (office != null) {
+      return office.pluginType;
+    }
+    return switch (layout) {
+      ViewLayoutPB.Board => PluginType.board,
+      ViewLayoutPB.Calendar => PluginType.calendar,
+      ViewLayoutPB.Document => PluginType.document,
+      ViewLayoutPB.Grid => PluginType.grid,
+      ViewLayoutPB.Chat => PluginType.chat,
+      _ => throw UnimplementedError(),
+    };
+  }
 
   Plugin plugin({
     Map<String, dynamic> arguments = const {},
@@ -127,8 +140,14 @@ extension ViewExtension on ViewPB {
         );
       case ViewLayoutPB.Chat:
         return AIChatPagePlugin(view: this);
+      case ViewLayoutPB.Word:
+        return WordPlugin(view: this);
+      case ViewLayoutPB.Excel:
+      case ViewLayoutPB.Slides:
+      case ViewLayoutPB.Pdf:
+        return OfficePlugin(view: this);
     }
-    throw UnimplementedError;
+    throw UnimplementedError();
   }
 
   DatabaseTabBarItemBuilder tabBarItem() => switch (layout) {
@@ -330,7 +349,11 @@ extension ViewLayoutExtension on ViewLayoutPB {
         ViewLayoutPB.Chat ||
         ViewLayoutPB.Grid ||
         ViewLayoutPB.Board ||
-        ViewLayoutPB.Calendar =>
+        ViewLayoutPB.Calendar ||
+        ViewLayoutPB.Word ||
+        ViewLayoutPB.Excel ||
+        ViewLayoutPB.Slides ||
+        ViewLayoutPB.Pdf =>
           false,
         _ => throw Exception('Unknown layout type'),
       };
@@ -340,7 +363,13 @@ extension ViewLayoutExtension on ViewLayoutPB {
         ViewLayoutPB.Board ||
         ViewLayoutPB.Calendar =>
           true,
-        ViewLayoutPB.Document || ViewLayoutPB.Chat => false,
+        ViewLayoutPB.Document ||
+        ViewLayoutPB.Chat ||
+        ViewLayoutPB.Word ||
+        ViewLayoutPB.Excel ||
+        ViewLayoutPB.Slides ||
+        ViewLayoutPB.Pdf =>
+          false,
         _ => throw Exception('Unknown layout type'),
       };
 
@@ -356,7 +385,14 @@ extension ViewLayoutExtension on ViewLayoutPB {
       };
 
   double get pluginHeight => switch (this) {
-        ViewLayoutPB.Document || ViewLayoutPB.Board || ViewLayoutPB.Chat => 450,
+        ViewLayoutPB.Document ||
+        ViewLayoutPB.Board ||
+        ViewLayoutPB.Chat ||
+        ViewLayoutPB.Word ||
+        ViewLayoutPB.Excel ||
+        ViewLayoutPB.Slides ||
+        ViewLayoutPB.Pdf =>
+          450,
         ViewLayoutPB.Calendar => 650,
         ViewLayoutPB.Grid => double.infinity,
         _ => throw UnimplementedError(),

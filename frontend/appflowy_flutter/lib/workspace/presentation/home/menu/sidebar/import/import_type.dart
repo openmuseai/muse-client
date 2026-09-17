@@ -9,7 +9,11 @@ enum ImportType {
   historyDatabase,
   markdownOrText,
   csv,
-  afDatabase;
+  afDatabase,
+  wordDocx,
+  excelXlsx,
+  slidesPptx,
+  pdfFile;
 
   @override
   String toString() {
@@ -24,8 +28,25 @@ enum ImportType {
         return LocaleKeys.importPanel_csv.tr();
       case ImportType.afDatabase:
         return LocaleKeys.importPanel_database.tr();
+      case ImportType.wordDocx:
+        return 'Word (.docx)';
+      case ImportType.excelXlsx:
+        return 'Excel (.xlsx)';
+      case ImportType.slidesPptx:
+        return 'Slides (.pptx)';
+      case ImportType.pdfFile:
+        return 'PDF (.pdf)';
     }
   }
+
+  /// Office plugin catalog id, or null for Document/Database imports.
+  String? get officePluginId => switch (this) {
+        ImportType.wordDocx => 'word',
+        ImportType.excelXlsx => 'excel',
+        ImportType.slidesPptx => 'slides',
+        ImportType.pdfFile => 'pdf',
+        _ => null,
+      };
 
   WidgetBuilder get icon => (context) {
         final FlowySvgData svg;
@@ -38,6 +59,11 @@ enum ImportType {
             svg = FlowySvgs.board_s;
           case ImportType.markdownOrText:
             svg = FlowySvgs.text_s;
+          case ImportType.wordDocx:
+          case ImportType.excelXlsx:
+          case ImportType.slidesPptx:
+          case ImportType.pdfFile:
+            svg = FlowySvgs.icon_document_s;
         }
 
         return FlowySvg(
@@ -68,6 +94,14 @@ enum ImportType {
         return ['md', 'txt'];
       case ImportType.csv:
         return ['csv'];
+      case ImportType.wordDocx:
+        return ['docx'];
+      case ImportType.excelXlsx:
+        return ['xlsx'];
+      case ImportType.slidesPptx:
+        return ['pptx'];
+      case ImportType.pdfFile:
+        return ['pdf'];
     }
   }
 
@@ -78,7 +112,12 @@ enum ImportType {
       case ImportType.csv:
       case ImportType.afDatabase:
       case ImportType.markdownOrText:
+      case ImportType.wordDocx:
+      case ImportType.excelXlsx:
+      case ImportType.slidesPptx:
+      case ImportType.pdfFile:
         return true;
     }
   }
 }
+

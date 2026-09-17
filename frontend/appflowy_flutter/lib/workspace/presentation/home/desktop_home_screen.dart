@@ -164,7 +164,8 @@ class DesktopHomeScreen extends StatelessWidget {
                               final workspace = state.currentWorkspace;
                               if (workspace != null) {
                                 unawaited(
-                                    DshWorkspaceBridge.publish(workspace));
+                                  DshWorkspaceBridge.publish(workspace),
+                                );
                               }
                             },
                             child: HomeHotKeys(
