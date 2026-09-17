@@ -3,6 +3,27 @@ import FlutterMacOS
 
 private let kTrafficLightOffetTop = 14
 
+/// Desktop `flutter run --no-enable-impeller` sets FLUTTER_ENGINE_SWITCH_* in
+/// the process environment. `open .app` does not, and FLTEnableImpeller in
+/// Info.plist is not read on macOS — Impeller then blacks out the window
+/// (WKWebView platform views / newer macOS). Apply the same switch here
+/// before the engine starts.
+func disableImpellerForDesktop() {
+  setenv("FLUTTER_ENGINE_SWITCHES", "1", 1)
+  setenv("FLUTTER_ENGINE_SWITCH_1", "enable-impeller=false", 1)
+}
+
+/// `open .app` starts with cwd `/`. Anything that lists Directory.current
+/// then hangs on automounts / TCC-protected folders.
+func sanitizeWorkingDirectory() {
+  let cwd = FileManager.default.currentDirectoryPath
+  if cwd == "/" {
+    FileManager.default.changeCurrentDirectoryPath(
+      FileManager.default.homeDirectoryForCurrentUser.path
+    )
+  }
+}
+
 class MainFlutterWindow: NSWindow {
   func registerMethodChannel(flutterViewController: FlutterViewController) {
     let cocoaWindowChannel = FlutterMethodChannel(name: "flutter/cocoaWindow", binaryMessenger: flutterViewController.engine.binaryMessenger)
@@ -63,7 +84,10 @@ class MainFlutterWindow: NSWindow {
   }
 
   override func awakeFromNib() {
+    disableImpellerForDesktop()
+    sanitizeWorkingDirectory()
     let flutterViewController = FlutterViewController.init()
+    flutterViewController.backgroundColor = NSColor.windowBackgroundColor
     let windowFrame = self.frame
     self.contentViewController = flutterViewController
 

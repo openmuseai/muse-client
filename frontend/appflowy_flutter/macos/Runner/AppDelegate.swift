@@ -3,6 +3,12 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  override func applicationWillFinishLaunching(_ notification: Notification) {
+    disableImpellerForDesktop()
+    sanitizeWorkingDirectory()
+    super.applicationWillFinishLaunching(notification)
+  }
+
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     return false
   }
