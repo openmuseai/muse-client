@@ -19,6 +19,14 @@ from pathlib import Path
 MUSE_SHORT = {
     "@muse/dsh-appflowy": "dsh-appflowy",
     "@muse/host-bridge": "host-bridge",
+    "@muse/contract-resource": "contract-resource",
+    "@muse/contract-presentation": "contract-presentation",
+    "@muse/contract-engine-session": "contract-engine-session",
+    "@muse/resource-host": "resource-host",
+    "@muse/dsh-resource-presentation": "dsh-resource-presentation",
+    "@muse/dsh-resource-presentation-host": "dsh-resource-presentation-host",
+    "@muse/dsh-client-ui-resource-open": "dsh-client-ui-resource-open",
+    "@muse/dsh-tool-resource-present": "dsh-tool-resource-present",
     "@muse/plugin-kit": "plugin-kit",
     "@muse/plugin-facets": "plugin-facets",
     "@muse/plugin-graph": "plugin-graph",
@@ -36,6 +44,7 @@ HARNESS_ALIASES = {
     "@deepseek-ai/dsh-tools": ("packages/core/tools",),
     "@deepseek-ai/cordis": ("vendor/cordis",),
     "@deepseek-ai/dsh-system-prompt": ("packages/core/system-prompt",),
+    "@deepseek-ai/dsh-session": ("packages/core/session",),
 }
 
 

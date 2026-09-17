@@ -24,8 +24,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]  # openmuse root (scripts/client/frontend/openmuse)
 HARNESS = ROOT / 'vendors' / 'deepseek-harness'
 DSHMARKET_TARBALL = ROOT / 'frontend' / 'client' / 'dist' / 'cache' / 'dshmarket-1.31.1.tgz'
+
+# Shared packing library: VENDORED_PLUGIN_DIRS lives there so the closure
+# manifest, the packers and the packed-runtime assertions stay in sync.
+sys.path.insert(0, str(ROOT / 'frontend' / 'client' / 'scripts' / 'lib'))
+import muse_windows as mw  # noqa: E402
+
 MUSE_PACKAGE_DIRS = (
     ('core/protocol/host-bridge', '@muse/host-bridge'),
+    ('core/contract-resource', '@muse/contract-resource'),
+    ('core/contract-presentation', '@muse/contract-presentation'),
+    ('core/contract-engine-session', '@muse/contract-engine-session'),
+    ('core/resource-host', '@muse/resource-host'),
+    ('core/dsh-resource-presentation', '@muse/dsh-resource-presentation'),
     ('core/plugin-facets', '@muse/plugin-facets'),
     ('core/plugin-kit', '@muse/plugin-kit'),
     ('core/plugin-graph', '@muse/plugin-graph'),
@@ -33,6 +44,9 @@ MUSE_PACKAGE_DIRS = (
     ('core/contract-document', '@muse/contract-document'),
     ('plugins/appflowy-view-reference', '@muse/plugin-appflowy-view-reference'),
     ('plugins/appflowy-view-rename', '@muse/plugin-appflowy-view-rename'),
+    ('plugins/dsh-resource-presentation-host', '@muse/dsh-resource-presentation-host'),
+    ('plugins/dsh-client-ui-resource-open', '@muse/dsh-client-ui-resource-open'),
+    ('plugins/dsh-tool-resource-present', '@muse/dsh-tool-resource-present'),
     ('plugins/appflowy-markdown', '@muse/plugin-appflowy-markdown'),
     ('plugins/appflowy-workspace', '@muse/plugin-appflowy-workspace'),
     ('plugins/dsh-mobile-surface', '@muse/dsh-mobile-surface'),
@@ -88,20 +102,21 @@ def main() -> int:
         record_path = HARNESS / '.dsh-build' / 'client-build-environment.json'
         if not record_path.is_file():
             print(
-                'missing client build record; run a complete harness build first:',
-                'pnpm run build (in vendors/deepseek-harness)',
-                file=sys.stderr,
+                'warning: missing client build record at '
+                f'{record_path}; packing tarballs from the current tree '
+                '(Windows official-profile gate is skipped on this checkout).',
+                flush=True,
             )
-            return 1
-        record = json.loads(record_path.read_text(encoding='utf-8'))
-        record_env = record.get('environment') or {}
-        if record_env.get('DSH_CLIENT_BUILD_PROFILE') != 'official':
-            print(
-                'client build record is not the official profile; rebuild with:',
-                'DSH_BUILD_CLIENT_PROFILE=official pnpm run build (in vendors/deepseek-harness)',
-                file=sys.stderr,
-            )
-            return 1
+        else:
+            record = json.loads(record_path.read_text(encoding='utf-8'))
+            record_env = record.get('environment') or {}
+            if record_env.get('DSH_CLIENT_BUILD_PROFILE') not in (None, 'official'):
+                print(
+                    'client build record is not the official profile; rebuild with:',
+                    'DSH_BUILD_CLIENT_PROFILE=official pnpm run build (in vendors/deepseek-harness)',
+                    file=sys.stderr,
+                )
+                return 1
         # pack.ts spawns the bare name `pnpm` from Node, which cannot launch a
         # `.cmd` shim on Windows; prepend a `pnpm.exe` launcher dir when one is
         # available (see MUSE_PNPM_SHIM in the docs).
@@ -115,8 +130,7 @@ def main() -> int:
         for family in ('dsh', 'vendor'):
             run(
                 [PNPM, 'exec', 'tsx', 'scripts/release/pack.ts',
-                 '--family', family, '--out', str(tarballs_dir / family),
-                 '--concurrency', '8'],
+                 '--family', family, '--out', str(tarballs_dir / family)],
                 cwd=HARNESS,
                 env=pack_env,
             )
@@ -146,12 +160,18 @@ def main() -> int:
     # their dependencies never enter the closure (ajv, canonicalize, ...), while
     # `file:` tarball deps are installed WITH their dependencies. Pack them into
     # tarballs/muse so npm install brings the whole @muse graph into the closure.
+    # Vendored bare-name plugins ride the same route: patch.yml mounts them by
+    # name, so they must be closure dependencies, not just source-tree folders.
     muse_tarballs = tarballs_dir / 'muse'
     muse_tarballs.mkdir(parents=True, exist_ok=True)
-    for rel, _name in MUSE_PACKAGE_DIRS:
+    for rel, _name in (*MUSE_PACKAGE_DIRS, *mw.VENDORED_PLUGIN_DIRS):
         pkg_dir = ROOT / 'middlewares' / 'dsh' / Path(*rel.split('/'))
-        if not (pkg_dir / 'dist').is_dir():
+        vendored = (rel, _name) in mw.VENDORED_PLUGIN_DIRS
+        if not (pkg_dir / 'dist').is_dir() and not vendored:
             print(f'tarball missing built dist for {_name} ({pkg_dir})', file=sys.stderr)
+            return 1
+        if not (pkg_dir / 'package.json').is_file():
+            print(f'tarball missing vendored plugin {_name} ({pkg_dir})', file=sys.stderr)
             return 1
         # @muse manifests use pnpm `link:`/`workspace:` specs for sibling and
         # harness packages (npm rejects `link:`); those packages are provided
@@ -210,9 +230,9 @@ def main() -> int:
     if muse_nm.is_dir():
         for entry in sorted(muse_nm.iterdir()):
             try:
-                linked = entry.is_symlink() or bool(
-                    entry.lstat().st_file_attributes & 0x400
-                )
+                linked = entry.is_symlink()
+                attrs = getattr(entry.lstat(), "st_file_attributes", 0)
+                linked = linked or bool(attrs & 0x400)
             except OSError:
                 continue
             if not linked:

@@ -44,7 +44,7 @@ execute() {
   install -d "${BINDIR}"
   sudo mv "${srcdir}/${PROJECT_NAME}" /opt
   log_info "installed ${BINDIR}/${PROJECT_NAME}"
-  (cd "/opt/${PROJECT_NAME}" && ./dsh-office)
+  (cd "/opt/${PROJECT_NAME}" && ./muse)
 }
 
 is_supported_platform() {
@@ -360,11 +360,11 @@ End of functions from https://github.com/client9/shlib
 ------------------------------------------------------------------------
 EOF
 
-PROJECT_NAME="dsh-office"
-SHORTHAND_PROJECT_NAME="dsh-office"
+PROJECT_NAME="muse"
+SHORTHAND_PROJECT_NAME="muse"
 OWNER=openmuseai
-REPO="dsh-office"
-BINARY=dsh-office
+REPO="openmuse"
+BINARY=openmuse
 FORMAT=tar.gz
 OS=$(uname_os)
 ARCH=$(uname_arch)
