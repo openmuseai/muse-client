@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Replace /Applications/DSH Office.app with the packed Muse client.
+# Replace /Applications/Muse.app with the packed Muse client.
 # The stock AppFlowy already in /Applications is a different app (no DSH runtime).
 #
 # Usage:
@@ -11,12 +11,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/muse-macos.sh"
 
 ROOT="$(muse_root)"
-SRC="$(muse_dist_dir)/macos/DSH Office.app"
-DEST="/Applications/DSH Office.app"
+SRC="$(muse_dist_dir)/macos/${BRAND_MACOS_BUNDLE}"
+DEST="/Applications/${BRAND_MACOS_BUNDLE}"
 
-if [[ ! -d "$SRC/Contents/Resources/muse/dsh" ]]; then
+if [[ ! -f "$SRC/Contents/Resources/muse/patch.yml" ]]; then
   echo "packed client missing: $SRC" >&2
-  echo "Run frontend/client/scripts/pack-macos-client.sh --debug first." >&2
+  echo "Run frontend/client/scripts/pack-macos-client.py first." >&2
+  exit 1
+fi
+if [[ ! -d "$SRC/Contents/Resources/muse/closure" && ! -d "$SRC/Contents/Resources/muse/dsh" ]]; then
+  echo "packed client is missing muse/closure (or legacy muse/dsh): $SRC" >&2
   exit 1
 fi
 

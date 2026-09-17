@@ -7,7 +7,7 @@
 # Steps:
 #   1. Muse TS packages (unless --skip-packages)
 #   2. AppFlowy dart-ffi / Rust Host (unless --skip-core)
-#   3. flutter pub get + flutter build macos (debug)
+#   3. engine assets + flutter pub get + flutter build macos (debug)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,6 +55,14 @@ if [[ "$SKIP_CORE" == false ]]; then
     echo "protoc-gen-dart is not on PATH (expected in \$HOME/.pub-cache/bin)" >&2
     exit 1
   fi
+  # collab-folder git rev 4dfccef has no Excel/Slides/Pdf; patch the checkout
+  # then drop the cached rlib (cargo fingerprints git deps by rev, not dirty files).
+  "${FRONTEND}/scripts/tool/patch_collab_word_layout.sh"
+  (
+    cd "${FRONTEND}/rust-lib"
+    # cargo make builds with --target, which lives in target/<triple>/ not target/debug.
+    cargo clean -p collab-folder --target "$(uname -m | sed 's/arm64/aarch64/;s/x86_64/x86_64/')-apple-darwin"
+  )
   (
     cd "$FRONTEND"
     cargo make --profile "$PROFILE" appflowy-core-dev
@@ -64,13 +72,17 @@ fi
 echo "==> Flutter pub get + debug macOS build"
 (
   cd "$FLUTTER_DIR"
+  echo "==> Building embedded Helix and Open File Viewer engine assets"
+  ./tool/build_macos_engine_assets.sh
   flutter pub get
-  # Impeller is disabled in macos/Runner/Info.plist (FLTEnableImpeller).
-  # --no-enable-impeller is a flutter-run flag, not a build flag.
+  # Impeller is disabled in macos/Runner/MainFlutterWindow.swift (engine switch)
+  # because FLTEnableImpeller in Info.plist is not applied on macOS. Direct
+  # `open .app` would otherwise black-screen. `flutter run --no-enable-impeller`
+  # remains the supported path for `run-macos-appflowy.sh`.
   flutter build macos --debug
 )
 
-APP="$FLUTTER_DIR/build/macos/Build/Products/Debug/DSH Office.app"
+APP="$FLUTTER_DIR/build/macos/Build/Products/Debug/${BRAND_MACOS_BUNDLE}"
 if [[ ! -d "$APP" ]]; then
   echo "expected app missing: $APP" >&2
   exit 1

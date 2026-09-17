@@ -40,15 +40,15 @@ muse_export_toolchain
 muse_require_flutter_327
 ROOT="$(muse_root)"
 FLUTTER_DIR="$(muse_flutter_dir)"
-APP="$FLUTTER_DIR/build/macos/Build/Products/Debug/DSH Office.app"
+APP="$FLUTTER_DIR/build/macos/Build/Products/Debug/${BRAND_MACOS_BUNDLE}"
 
 if [[ "$NO_BUILD" == false ]]; then
   "${SCRIPT_DIR}/build-macos-appflowy.sh" "${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"}"
 fi
 
-if pgrep -f "$APP/Contents/MacOS/DSH Office" >/dev/null 2>&1; then
-  echo "==> Stopping previous debug DSH Office"
-  pkill -f "$APP/Contents/MacOS/DSH Office" || true
+if pgrep -f "$APP/Contents/MacOS/${BRAND_MACOS_APP}" >/dev/null 2>&1; then
+  echo "==> Stopping previous debug ${BRAND_NAME_EN}"
+  pkill -f "$APP/Contents/MacOS/${BRAND_MACOS_APP}" || true
   sleep 1
 fi
 

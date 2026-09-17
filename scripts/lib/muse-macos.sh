@@ -28,6 +28,7 @@ muse_root() {
 
 # shellcheck source=muse-paths.sh
 source "${_MUSE_LIB_DIR}/muse-paths.sh"
+eval "$(python3 "${_MUSE_LIB_DIR}/brand_config.py" --export-env)"
 
 muse_macos_profile() {
   case "$(uname -m)" in
@@ -128,6 +129,11 @@ muse_package_dirs() {
   # Paths relative to middlewares/dsh/. Dependency order: contracts first, DSH bundle last.
   printf '%s\n' \
     core/protocol/host-bridge \
+    core/contract-resource \
+    core/contract-presentation \
+    core/contract-engine-session \
+    core/resource-host \
+    core/dsh-resource-presentation \
     core/plugin-facets \
     core/plugin-kit \
     core/plugin-graph \
@@ -135,6 +141,9 @@ muse_package_dirs() {
     core/contract-document \
     plugins/appflowy-view-reference \
     plugins/appflowy-view-rename \
+    plugins/dsh-resource-presentation-host \
+    plugins/dsh-client-ui-resource-open \
+    plugins/dsh-tool-resource-present \
     plugins/appflowy-markdown \
     plugins/appflowy-workspace \
     plugins/dsh-mobile-surface \
@@ -149,6 +158,11 @@ muse_link_dsh_packages() {
   mkdir -p "$dest"
   ln -sfn "$pkg_root/plugins/dsh-appflowy" "$dest/dsh-appflowy"
   ln -sfn "$pkg_root/core/protocol/host-bridge" "$dest/host-bridge"
+  ln -sfn "$pkg_root/core/contract-resource" "$dest/contract-resource"
+  ln -sfn "$pkg_root/core/contract-presentation" "$dest/contract-presentation"
+  ln -sfn "$pkg_root/core/contract-engine-session" "$dest/contract-engine-session"
+  ln -sfn "$pkg_root/core/resource-host" "$dest/resource-host"
+  ln -sfn "$pkg_root/core/dsh-resource-presentation" "$dest/dsh-resource-presentation"
   ln -sfn "$pkg_root/core/plugin-kit" "$dest/plugin-kit"
   ln -sfn "$pkg_root/core/plugin-facets" "$dest/plugin-facets"
   ln -sfn "$pkg_root/core/plugin-graph" "$dest/plugin-graph"
@@ -158,6 +172,9 @@ muse_link_dsh_packages() {
   ln -sfn "$pkg_root/plugins/appflowy-workspace" "$dest/plugin-appflowy-workspace"
   ln -sfn "$pkg_root/plugins/appflowy-view-reference" "$dest/plugin-appflowy-view-reference"
   ln -sfn "$pkg_root/plugins/appflowy-view-rename" "$dest/plugin-appflowy-view-rename"
+  ln -sfn "$pkg_root/plugins/dsh-resource-presentation-host" "$dest/dsh-resource-presentation-host"
+  ln -sfn "$pkg_root/plugins/dsh-client-ui-resource-open" "$dest/dsh-client-ui-resource-open"
+  ln -sfn "$pkg_root/plugins/dsh-tool-resource-present" "$dest/dsh-tool-resource-present"
   ln -sfn "$pkg_root/plugins/dsh-mobile-surface" "$dest/dsh-mobile-surface"
   ln -sfn "$pkg_root/plugins/dsh-mobile-input" "$dest/dsh-mobile-input"
 }
@@ -175,6 +192,11 @@ muse_copy_dsh_packages() {
     case "$src" in
       plugins/dsh-appflowy) name="dsh-appflowy" ;;
       core/protocol/host-bridge) name="host-bridge" ;;
+      core/contract-resource) name="contract-resource" ;;
+      core/contract-presentation) name="contract-presentation" ;;
+      core/contract-engine-session) name="contract-engine-session" ;;
+      core/resource-host) name="resource-host" ;;
+      core/dsh-resource-presentation) name="dsh-resource-presentation" ;;
       core/plugin-kit) name="plugin-kit" ;;
       core/plugin-facets) name="plugin-facets" ;;
       core/plugin-graph) name="plugin-graph" ;;
@@ -184,6 +206,9 @@ muse_copy_dsh_packages() {
       plugins/appflowy-workspace) name="plugin-appflowy-workspace" ;;
       plugins/appflowy-view-reference) name="plugin-appflowy-view-reference" ;;
       plugins/appflowy-view-rename) name="plugin-appflowy-view-rename" ;;
+      plugins/dsh-resource-presentation-host) name="dsh-resource-presentation-host" ;;
+      plugins/dsh-client-ui-resource-open) name="dsh-client-ui-resource-open" ;;
+      plugins/dsh-tool-resource-present) name="dsh-tool-resource-present" ;;
       plugins/dsh-mobile-surface) name="dsh-mobile-surface" ;;
       plugins/dsh-mobile-input) name="dsh-mobile-input" ;;
       *) name="$(basename "$src")" ;;
@@ -272,17 +297,37 @@ muse_stage_node() {
   fi
 }
 
-# Ad-hoc sign without dropping Flutter's entitlements. A bare
-# `codesign --force -s -` strips them and the Flutter view stays black.
+# Ad-hoc sign nested frameworks then the bundle. Hardened Runtime on the
+# main executable without disable-library-validation makes dyld reject
+# CocoaPods frameworks after a download (App Translocation).
 muse_codesign_app() {
   local app="$1"
-  local exe="$app/Contents/MacOS/DSH Office"
+  local exe="$app/Contents/MacOS/${BRAND_MACOS_APP}"
+  local entitlements
+  entitlements="$(muse_flutter_dir)/macos/Runner/Release.entitlements"
   if [[ ! -x "$exe" ]]; then
     echo "cannot codesign, missing $exe" >&2
     return 1
   fi
-  codesign --force -s - --preserve-metadata=entitlements,flags,runtime "$exe"
-  codesign --force -s - --preserve-metadata=entitlements,flags,runtime "$app"
+  local item
+  if [[ -d "$app/Contents/Frameworks" ]]; then
+    while IFS= read -r item; do
+      codesign --force -s - --options runtime --timestamp=none "$item"
+    done < <(
+      find "$app/Contents/Frameworks" -name '*.dylib' 2>/dev/null
+      find "$app/Contents/Frameworks" -name '*.xpc' 2>/dev/null
+      find "$app/Contents/Frameworks" -name '*.app' 2>/dev/null
+      find "$app/Contents/Frameworks" -maxdepth 1 -name '*.framework' 2>/dev/null
+    )
+  fi
+  if [[ -f "$entitlements" ]]; then
+    codesign --force -s - --options runtime --timestamp=none --entitlements "$entitlements" "$exe"
+    codesign --force -s - --options runtime --timestamp=none --entitlements "$entitlements" "$app"
+  else
+    codesign --force -s - --options runtime --timestamp=none "$exe"
+    codesign --force -s - --options runtime --timestamp=none "$app"
+  fi
+  codesign --verify --deep --strict "$app"
 }
 
 # npm package for https://github.com/dsh-market/dsh-market. Override with
