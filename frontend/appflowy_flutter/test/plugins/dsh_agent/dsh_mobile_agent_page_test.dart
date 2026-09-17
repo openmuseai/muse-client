@@ -47,10 +47,28 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  Future<void> open(WidgetTester tester, {bool cloudAccount = true}) async {
-    // Complete in the widget test's zone so asynchronous errors reach its
-    // awaiting page rather than the outer setUp zone's error handler.
+  Future<void> open(
+    WidgetTester tester, {
+    bool cloudAccount = true,
+    bool withSession = true,
+  }) async {
     credentials.result = Completer<DshDeviceCredential>();
+    DshSessionApi? api;
+    if (withSession) {
+      final origin = DshRemoteConfig.fromEnvironment()!.publicUri.origin;
+      api = DshSessionApi(
+        cloudOrigin: Uri.parse(origin),
+        accessToken: 'jwt',
+        post: (uri, headers, body) async => {
+          'data': {
+            'sessionRef': 'session.1',
+            'webUrl':
+                '$origin/u/abcdabcdabcdabcdabcdabcdabcdabcd/?token=t',
+            'nodeId': 'local',
+          },
+        },
+      );
+    }
     await tester.pumpWidget(
       MaterialApp(
         home: DshMobileAgentPage(
@@ -59,6 +77,8 @@ void main() {
           accountRef: 'account.test',
           isCloudAccount: cloudAccount,
           isCurrentScope: () => currentScope,
+          sessionApi: api,
+          accessToken: withSession ? 'jwt' : null,
         ),
       ),
     );
@@ -82,7 +102,9 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(
           platform.controllers.single.requests.single.uri,
-          DshRemoteConfig.fromEnvironment()!.publicUri,
+          Uri.parse(
+            '${DshRemoteConfig.fromEnvironment()!.publicUri.origin}/u/abcdabcdabcdabcdabcdabcdabcdabcd/?token=t',
+          ),
         );
         expect(platform.controllers.single.requests.single.headers, isEmpty);
         expect(find.textContaining('正在尝试工作区联动'), findsOneWidget);
@@ -125,12 +147,12 @@ void main() {
         });
       }
 
-      testWidgets('guest loads chat without requesting device credentials',
+      testWidgets('guest without a session token does not load compile-time /dsh/',
           (tester) async {
-        await open(tester, cloudAccount: false);
+        await open(tester, cloudAccount: false, withSession: false);
         expect(credentials.calls, 0);
-        expect(find.byType(WebViewWidget), findsOneWidget);
-        expect(find.textContaining('工作区联动未连接'), findsOneWidget);
+        expect(find.byType(WebViewWidget), findsNothing);
+        expect(find.textContaining('登录 Cloud 后才能启动远程 Agent'), findsOneWidget);
         await close(tester);
       });
 

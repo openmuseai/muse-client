@@ -21,6 +21,8 @@ class DshAgentController extends ChangeNotifier {
   bool launching = false;
   bool ready = false;
   String? lastError;
+  String? errorCode;
+  String stage = 'Closed';
   var _restored = false;
 
   Future<void> restore() async {
@@ -47,6 +49,9 @@ class DshAgentController extends ChangeNotifier {
   void setOpen(bool value) {
     if (open == value) return;
     open = value;
+    if (!value) {
+      stage = 'Closed';
+    }
     notifyListeners();
     unawaited(_persist(KVKeys.dshPanelOpen, value.toString()));
   }
@@ -73,13 +78,16 @@ class DshAgentController extends ChangeNotifier {
   void setLaunching(bool value) {
     if (launching == value) return;
     launching = value;
+    if (value) stage = 'Placing';
     notifyListeners();
   }
 
-  void setError(String? value) {
+  void setError(String? value, {String? code}) {
     lastError = value;
+    errorCode = code;
     if (value != null) {
       ready = false;
+      stage = 'Failed';
     }
     notifyListeners();
   }
@@ -87,6 +95,10 @@ class DshAgentController extends ChangeNotifier {
   void setReady(bool value) {
     if (ready == value) return;
     ready = value;
+    if (value) {
+      stage = 'HybridLive';
+      errorCode = null;
+    }
     notifyListeners();
   }
 

@@ -2,10 +2,18 @@ import 'dart:async';
 
 import 'package:appflowy/env/cloud_env.dart';
 import 'package:appflowy/mobile/presentation/editor/mobile_editor_screen.dart';
+import 'package:appflowy/plugins/dsh_agent/dsh_body_snapshot.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_device_token_service.dart';
+import 'package:appflowy/plugins/dsh_agent/dsh_host_plugin_plane.dart';
+import 'package:appflowy/plugins/dsh_agent/dsh_workspace_catalog.dart';
+import 'package:appflowy/plugins/word/word_snapshot_cache.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy/workspace/application/view/view_ext.dart';
 import 'package:appflowy/workspace/application/view/view_service.dart';
 import 'package:appflowy/workspace/presentation/home/menu/menu_shared_state.dart';
+import 'package:appflowy_backend/dispatch/dispatch.dart';
+import 'package:appflowy_backend/log.dart';
+import 'package:appflowy_backend/protobuf/flowy-document/entities.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:flutter/material.dart';
 import 'package:muse_appflowy_facets/muse_appflowy_facets.dart';
@@ -63,6 +71,7 @@ class _AppFlowyDshControlSession implements DshControlSession {
   final _feed = MuseSurfaceContextFeed.instance;
   MuseParentBridgeAdapter? _adapter;
   MuseWorkspaceUiFacet? _facet;
+  final _plane = DshHostPluginPlane();
   StreamSubscription? _contexts;
   StreamSubscription? _closedSurfaces;
   Timer? _expiry;
@@ -100,7 +109,7 @@ class _AppFlowyDshControlSession implements DshControlSession {
     facet.register(inbox);
     final adapter = MuseParentBridgeAdapter(
       transport: MuseHttpSseTransport(
-        endpoint: _request.endpoint.resolve('/muse/v1/parent-bridge'),
+        endpoint: dshParentBridgeUri(_request.endpoint),
         headers: {
           'Authorization': 'Bearer ${credential.token}',
           'X-Muse-Device-Id': credential.deviceId,
@@ -120,8 +129,11 @@ class _AppFlowyDshControlSession implements DshControlSession {
     };
     await adapter.connect();
     if (!_live()) return;
-    _sourceView = getIt<MenuSharedState>().latestOpenView?.id;
+    final latest = getIt<MenuSharedState>().latestOpenView;
+    _sourceView = latest?.id ?? _sourceView;
     await adapter.contribute(facet.focus(viewId: _sourceView));
+    if (!_live()) return;
+    await _contributePluginPlane(adapter, latestLayout: latest?.layout);
     if (!_live()) return;
     _contexts = _feed.contributions.listen(_forward);
     _closedSurfaces = _feed.closedSurfaces.listen((ref) {
@@ -141,8 +153,13 @@ class _AppFlowyDshControlSession implements DshControlSession {
     _contextHeartbeat = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_live()) {
         unawaited(
-          adapter
-              .contribute(facet.focus(viewId: _sourceView))
+          () async {
+            await adapter.contribute(facet.focus(viewId: _sourceView));
+            await _contributePluginPlane(
+              adapter,
+              latestLayout: getIt<MenuSharedState>().latestOpenView?.layout,
+            );
+          }()
               .catchError((Object _) {
             if (_live()) {
               _request.onDegraded(DshMobileErrorCode.contextRefreshFailed.message);
@@ -164,6 +181,80 @@ class _AppFlowyDshControlSession implements DshControlSession {
     });
   }
 
+  Future<void> _contributePluginPlane(
+    MuseParentBridgeAdapter adapter, {
+    ViewLayoutPB? latestLayout,
+  }) async {
+    if (!_live()) return;
+    final views = await ViewBackendService.getAllViews();
+    final items = views.fold(
+      (list) => list.items
+          .map(
+            (view) => DshCatalogViewInput(
+              viewId: view.id,
+              title: view.name,
+              parentViewId: view.parentViewId,
+              layout: view.layout.value,
+              isSpace: view.isSpace,
+            ),
+          )
+          .toList(),
+      (error) {
+        Log.warn('DSH catalog views unavailable: $error');
+        return const <DshCatalogViewInput>[];
+      },
+    );
+    if (!_live()) return;
+    final catalog = _plane.catalog(
+      workspaceId: _request.workspaceRef,
+      views: items,
+      instanceRef: _facet?.instanceRef,
+    );
+    if (catalog != null) {
+      await adapter.contribute(catalog);
+    }
+    final viewId = _sourceView;
+    if (viewId == null || viewId.isEmpty) {
+      return;
+    }
+    final kind = dshBodySnapshotKind(
+      layout: latestLayout?.value,
+      viewId: viewId,
+    );
+    if (kind == DshBodySnapshotKind.word) {
+      final snapshot = _plane.wordSnapshot(
+        workspaceId: _request.workspaceRef,
+        viewId: viewId,
+        text: WordSnapshotCache.instance.textFor(viewId) ?? '',
+        instanceRef: _facet?.instanceRef,
+      );
+      if (snapshot != null) {
+        await adapter.contribute(snapshot);
+      }
+      return;
+    }
+    if (kind != DshBodySnapshotKind.markdown) {
+      return;
+    }
+    final document = await DocumentEventGetDocumentText(
+      OpenDocumentPayloadPB(documentId: viewId),
+    ).send();
+    final text = document.fold((pb) => pb.text, (error) {
+      Log.warn('DSH snapshot text unavailable: $error');
+      return '';
+    });
+    if (!_live()) return;
+    final snapshot = _plane.snapshot(
+      workspaceId: _request.workspaceRef,
+      viewId: viewId,
+      text: text,
+      instanceRef: _facet?.instanceRef,
+    );
+    if (snapshot != null) {
+      await adapter.contribute(snapshot);
+    }
+  }
+
   void _forward(MuseContextContributionV1 value) {
     final adapter = _adapter;
     if (!_live() ||
@@ -176,7 +267,10 @@ class _AppFlowyDshControlSession implements DshControlSession {
       return;
     }
     if (value.contextType != 'markdown.surface' &&
-        value.contextType != 'markdown.selection') {
+        value.contextType != 'markdown.selection' &&
+        value.contextType != 'word.surface' &&
+        value.contextType != 'word.selection' &&
+        value.contextType != 'word.snapshot') {
       return;
     }
     void send() {

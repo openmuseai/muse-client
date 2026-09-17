@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,10 +12,12 @@ class DshEmbeddedView extends StatefulWidget {
     super.key,
     required this.url,
     required this.onError,
+    required this.onOpenResource,
   });
 
   final String url;
   final ValueChanged<String> onError;
+  final ValueChanged<DshResourceOpenMessage> onOpenResource;
 
   @override
   State<DshEmbeddedView> createState() => _DshEmbeddedViewState();
@@ -26,15 +29,66 @@ class _DshEmbeddedViewState extends State<DshEmbeddedView> {
     if (Platform.isWindows) {
       return _WindowsWebView(url: widget.url, onError: widget.onError);
     }
-    return _FlutterWebView(url: widget.url, onError: widget.onError);
+    return _FlutterWebView(
+      url: widget.url,
+      onError: widget.onError,
+      onOpenResource: widget.onOpenResource,
+    );
   }
 }
 
+class DshResourceOpenMessage {
+  const DshResourceOpenMessage({
+    required this.path,
+    required this.cwd,
+    this.line,
+    this.comparisonId,
+    this.changeId,
+  });
+
+  factory DshResourceOpenMessage.fromJson(Map<dynamic, dynamic> value) {
+    final path = value['path'];
+    final cwd = value['cwd'];
+    final line = value['line'];
+    final comparisonId = value['comparisonId'];
+    final changeId = value['changeId'];
+    if (path is! String ||
+        cwd is! String ||
+        path.isEmpty ||
+        cwd.isEmpty ||
+        path.length > 4096 ||
+        cwd.length > 4096 ||
+        (comparisonId != null &&
+            (comparisonId is! String || comparisonId.length > 512)) ||
+        (changeId != null && (changeId is! String || changeId.length > 512))) {
+      throw const FormatException('Invalid DSH resource open message');
+    }
+    return DshResourceOpenMessage(
+      path: path,
+      cwd: cwd,
+      line: line is int && line > 0 ? line : null,
+      comparisonId: comparisonId as String?,
+      changeId: changeId as String?,
+    );
+  }
+
+  final String path;
+  final String cwd;
+  final int? line;
+  final String? comparisonId;
+  final String? changeId;
+}
+
 class _FlutterWebView extends StatefulWidget {
-  const _FlutterWebView({required this.url, required this.onError});
+  const _FlutterWebView({
+    required this.url,
+    required this.onError,
+    required this.onOpenResource,
+  });
 
   final String url;
   final ValueChanged<String> onError;
+  final ValueChanged<DshResourceOpenMessage> onOpenResource;
 
   @override
   State<_FlutterWebView> createState() => _FlutterWebViewState();
@@ -63,6 +117,12 @@ class _FlutterWebViewState extends State<_FlutterWebView> {
       // UnimplementedError ("opaque is not implemented on macOS").
       final controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..addJavaScriptChannel(
+          'MuseHostResource',
+          onMessageReceived: (message) {
+            unawaited(_handleResourceOpen(message.message));
+          },
+        )
         ..setNavigationDelegate(
           NavigationDelegate(
             onWebResourceError: (error) {
@@ -86,6 +146,25 @@ class _FlutterWebViewState extends State<_FlutterWebView> {
         'Embedded DSH view is unavailable on this build.\n$error',
       );
     }
+  }
+
+  Future<void> _handleResourceOpen(String raw) async {
+    final url = await _controller?.currentUrl();
+    final uri = url == null ? null : Uri.tryParse(url);
+    if (uri == null ||
+        uri.scheme != 'http' ||
+        (uri.host != '127.0.0.1' && uri.host != 'localhost')) {
+      return;
+    }
+    try {
+      final value = jsonDecode(raw);
+      if (value is! Map ||
+          (value['type'] != 'resource.open' &&
+              value['type'] != 'resource.diff.open')) {
+        return;
+      }
+      widget.onOpenResource(DshResourceOpenMessage.fromJson(value));
+    } catch (_) {}
   }
 
   @override

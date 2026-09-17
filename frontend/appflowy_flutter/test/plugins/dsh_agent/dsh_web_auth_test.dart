@@ -20,9 +20,14 @@ void main() {
       DshWebAuth.extractLaunchToken('dsh web: http://127.0.0.1:3080/'),
       isNull,
     );
+    expect(
+      DshWebAuth.extractLaunchUrl('dsh web: http://127.0.0.1:3080'),
+      'http://127.0.0.1:3080',
+    );
   });
 
   test('does not declare the sidecar ready before the launch token arrives', () {
+    expect(DshWebAuth.isStartupProbeHealthy(200, null), isTrue);
     expect(DshWebAuth.isStartupProbeHealthy(401, null), isFalse);
     expect(DshWebAuth.isStartupProbeHealthy(401, 'launch-token'), isTrue);
     expect(DshWebAuth.isStartupProbeHealthy(500, 'launch-token'), isFalse);

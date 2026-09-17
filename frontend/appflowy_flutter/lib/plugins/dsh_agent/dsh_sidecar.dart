@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:appflowy/plugins/dsh_agent/dsh_agent_controller.dart';
+import 'package:appflowy/plugins/dsh_agent/dsh_desktop_error.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_runtime.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_web_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -80,7 +81,10 @@ class DshSidecar {
           _sessionUrl = null;
           if (_stopping || !controller.ready) return;
           controller.setReady(false);
-          controller.setError(DshWebAuth.summarizeExit(code, _logTail));
+          controller.setError(
+            DshWebAuth.summarizeExit(code, _logTail),
+            code: DshDesktopError.sidecarExit,
+          );
         }),
       );
       unawaited(
@@ -114,7 +118,11 @@ class DshSidecar {
       throw StateError('DSH sidecar did not become ready on ${controller.url}');
     } catch (error) {
       controller.setReady(false);
-      controller.setError(error.toString());
+      final message = error.toString();
+      controller.setError(
+        message,
+        code: DshDesktopError.codeFromMessage(message),
+      );
       rethrow;
     } finally {
       _starting = false;
@@ -224,7 +232,10 @@ class DshSidecar {
         leakedHost.deleteSync(recursive: true);
       }
     }
-    final roots = <String>['dshmarket'];
+    // Bare names patch.yml mounts that are not part of the @muse scope. The
+    // Loader resolves `name: dsh-model-capabilities` from the profile
+    // node_modules, so this vendored plugin has to be seeded like dshmarket.
+    final roots = <String>['dshmarket', 'dsh-model-capabilities'];
     final museScope = Directory('${closureNm.path}/@muse');
     if (museScope.existsSync()) {
       for (final entity in museScope.listSync()) {
@@ -315,7 +326,6 @@ class DshSidecar {
         'web',
         '--patch',
         resolved.patchFile,
-        '--no-open',
         '--host',
         DshWebAuth.listenHost,
         '--port',

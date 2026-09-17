@@ -13,14 +13,15 @@ class DshWebAuth {
   static final _launchUrlPattern = RegExp(r'dsh web:\s*(\S+)');
 
   /// Full loopback URL printed by `dsh web`, or null when [text] has none.
+  ///
+  /// Current DSH prints `dsh web: http://127.0.0.1:3080` with no `?token=`.
+  /// Older 0.1.2 hosts append a launch token. Both are valid session URLs.
   static String? extractLaunchUrl(String text) {
     final match = _launchUrlPattern.firstMatch(text);
     final raw = match?.group(1);
     if (raw == null) return null;
     final uri = Uri.tryParse(raw);
-    if (uri == null || !uri.hasScheme) return null;
-    final token = uri.queryParameters['token'];
-    if (token == null || token.isEmpty) return null;
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) return null;
     return raw;
   }
 
@@ -46,13 +47,14 @@ class DshWebAuth {
     );
   }
 
-  /// A live port plus the launch token. 401 without a token is not ready:
-  /// the panel would render the Host authentication error page.
+  /// Ready when the host serves the UI. A 401/403 still needs a launch token
+  /// so the WebView does not land on the Host authentication error page.
   static bool isStartupProbeHealthy(int status, String? launchToken) {
-    return launchToken != null &&
-        launchToken.isNotEmpty &&
-        status >= 200 &&
-        status < 500;
+    if (status < 200 || status >= 500) return false;
+    if (status == 401 || status == 403) {
+      return launchToken != null && launchToken.isNotEmpty;
+    }
+    return true;
   }
 
   /// PIDs with a TCP LISTEN on loopback [port], parsed from `netstat -ano`.

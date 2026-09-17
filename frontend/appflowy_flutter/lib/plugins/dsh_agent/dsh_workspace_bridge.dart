@@ -15,18 +15,22 @@ class DshWorkspaceBridge {
   }
 
   static Future<void> publish(UserWorkspacePB workspace) async {
-    final previous = await _read();
-    final sameWorkspace =
-        previous?['appflowyWorkspaceId'] == workspace.workspaceId;
-    await _write({
-      'appflowyWorkspaceId': workspace.workspaceId,
-      'title': workspace.name,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-      if (sameWorkspace && previous?['projectRoot'] is String)
-        'projectRoot': previous!['projectRoot'],
-      if (sameWorkspace && previous?['mounts'] is List)
-        'mounts': previous!['mounts'],
-    });
+    try {
+      final previous = await _read();
+      final sameWorkspace =
+          previous?['appflowyWorkspaceId'] == workspace.workspaceId;
+      await _write({
+        'appflowyWorkspaceId': workspace.workspaceId,
+        'title': workspace.name,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        if (sameWorkspace && previous?['projectRoot'] is String)
+          'projectRoot': previous!['projectRoot'],
+        if (sameWorkspace && previous?['mounts'] is List)
+          'mounts': previous!['mounts'],
+      });
+    } on FileSystemException {
+      // Hint publication is best-effort and must not fail Host startup.
+    }
   }
 
   static Future<void> publishProjectWorkspace({
@@ -37,23 +41,27 @@ class DshWorkspaceBridge {
     final localMounts = mounts
         .where((mount) => mount.providerId == 'muse.workspace.local.v1')
         .toList(growable: false);
-    await _write({
-      'appflowyWorkspaceId': appflowyWorkspaceId,
-      'title': title,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-      if (localMounts.isNotEmpty) 'projectRoot': localMounts.first.rootLocator,
-      'mounts': [
-        for (final mount in mounts)
-          {
-            'mountRef': mount.mountRef,
-            'providerId': mount.providerId,
-            'displayName': mount.displayName,
-            if (mount.providerId == 'muse.workspace.local.v1')
-              'root': mount.rootLocator,
-            'readOnly': mount.readOnly,
-          },
-      ],
-    });
+    try {
+      await _write({
+        'appflowyWorkspaceId': appflowyWorkspaceId,
+        'title': title,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        if (localMounts.isNotEmpty) 'projectRoot': localMounts.first.rootLocator,
+        'mounts': [
+          for (final mount in mounts)
+            {
+              'mountRef': mount.mountRef,
+              'providerId': mount.providerId,
+              'displayName': mount.displayName,
+              if (mount.providerId == 'muse.workspace.local.v1')
+                'root': mount.rootLocator,
+              'readOnly': mount.readOnly,
+            },
+        ],
+      });
+    } on FileSystemException {
+      // Hint publication is best-effort and must not fail Host startup.
+    }
   }
 
   static Future<Map<String, dynamic>?> _read() async {
@@ -68,9 +76,15 @@ class DshWorkspaceBridge {
   static Future<void> _write(Map<String, Object?> value) async {
     final file = hintFile;
     await file.parent.create(recursive: true);
-    final temporary = File('${file.path}.tmp');
+    final temporary = File(
+      '${file.path}.${pid}.${DateTime.now().microsecondsSinceEpoch}.tmp',
+    );
     await temporary.writeAsString(jsonEncode(value), flush: true);
-    if (await file.exists()) await file.delete();
+    try {
+      if (await file.exists()) await file.delete();
+    } on FileSystemException {
+      // A concurrent publisher may already have replaced the hint file.
+    }
     await temporary.rename(file.path);
   }
 }

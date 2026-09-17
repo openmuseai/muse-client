@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:appflowy/core/helpers/url_launcher.dart';
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_agent_controller.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_embedded_view.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_sidecar.dart';
+import 'package:appflowy/plugins/resource_surface/resource_surface.dart';
+import 'package:appflowy/plugins/version_diff/presentation/diff_deep_link_opener.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:flowy_infra_ui/style_widget/icon_button.dart';
 import 'package:flowy_infra_ui/style_widget/text.dart';
@@ -82,6 +86,13 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   FlowyIconButton(
+                    tooltipText: 'Open file in OpenMuse',
+                    width: 24,
+                    icon: const Icon(Icons.folder_open_outlined, size: 16),
+                    onPressed: () =>
+                        MuseResourceSurfaceOpener.pickAndOpen(context),
+                  ),
+                  FlowyIconButton(
                     tooltipText: 'Reload',
                     width: 24,
                     icon: const Icon(Icons.refresh, size: 16),
@@ -133,11 +144,13 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
       );
     }
     if (controller.lastError != null) {
-      if (controller.lastError!.contains('DEEPSEEK_API_KEY')) {
+      if (controller.errorCode == 'NEED_API_KEY' ||
+          controller.lastError!.contains('DEEPSEEK_API_KEY')) {
         return _apiKeyForm(controller);
       }
       return _message(
         controller.lastError!,
+        code: controller.errorCode,
         actionLabel: 'Retry',
         onAction: () => _retry(controller),
       );
@@ -159,6 +172,27 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
         onError: (message) {
           if (!mounted) return;
           setState(() => _webViewError = message);
+        },
+        onOpenResource: (message) {
+          unawaited(
+            message.comparisonId == null
+                ? MuseResourceSurfaceOpener.open(
+                    context,
+                    MuseResourceOpenRequest(
+                      path: message.path,
+                      sessionCwd: message.cwd,
+                      line: message.line,
+                      origin: MuseResourceOpenOrigin.dshConversation,
+                    ),
+                  )
+                : MuseDiffDeepLinkOpener.open(
+                    context: context,
+                    path: message.path,
+                    sessionCwd: message.cwd,
+                    comparisonId: message.comparisonId!,
+                    changeId: message.changeId,
+                  ),
+          );
         },
       ),
     );
@@ -223,6 +257,7 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
 
   Widget _message(
     String text, {
+    String? code,
     required String actionLabel,
     required VoidCallback onAction,
   }) {
@@ -232,6 +267,15 @@ class _DshAgentPanelState extends State<DshAgentPanel> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (code != null && code.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: FlowyText(
+                  code,
+                  fontSize: 12,
+                  textAlign: TextAlign.center,
+                ),
+              ),
             FlowyText(
               text,
               maxLines: 8,

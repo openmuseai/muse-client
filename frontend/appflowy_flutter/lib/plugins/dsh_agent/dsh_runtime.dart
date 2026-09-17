@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:appflowy/brand/brand.dart';
+
 /// Resolves the DSH sidecar layout for source-tree development and packed
 /// apps: macOS `Contents/Resources/muse`, Windows `{exeDir}/muse`.
 class DshRuntimeLayout {
@@ -60,27 +62,113 @@ class DshRuntimeLayout {
   }
 
   static String get userMuseHome {
+    final preferred = _preferredUserMuseHome();
+    _migrateLegacyUserMuseHome(preferred);
+    return preferred;
+  }
+
+  static String _preferredUserMuseHome() {
     if (Platform.isWindows) {
       final appData = Platform.environment['APPDATA']?.trim();
       if (appData != null && appData.isNotEmpty) {
-        return '$appData/DSH Office/Muse';
+        return '$appData/${Brand.dataDirName}';
       }
       final profile = Platform.environment['USERPROFILE']?.trim();
       if (profile != null && profile.isNotEmpty) {
-        return '$profile/AppData/Roaming/DSH Office/Muse';
+        return '$profile/AppData/Roaming/${Brand.dataDirName}';
       }
     } else if (Platform.isLinux) {
       final home = Platform.environment['HOME']?.trim();
       if (home != null && home.isNotEmpty) {
-        return '$home/.local/share/dsh-office/muse';
+        return '$home/.local/share/${Brand.dataDirLinux}';
       }
     } else {
       final home = Platform.environment['HOME']?.trim();
       if (home != null && home.isNotEmpty) {
-        return '$home/Library/Application Support/AppFlowy/Muse';
+        return '$home/Library/Application Support/${Brand.dataDirName}';
       }
     }
-    return '${Directory.systemTemp.path}/appflowy-muse';
+    return '${Directory.systemTemp.path}/${Brand.dataDirLinux}';
+  }
+
+  static List<String> _legacyUserMuseHomes() {
+    final homes = <String>[];
+    if (Platform.isWindows) {
+      final appData = Platform.environment['APPDATA']?.trim();
+      final profile = Platform.environment['USERPROFILE']?.trim();
+      if (appData != null && appData.isNotEmpty) {
+        homes.addAll([
+          '$appData/Muse',
+          '$appData/DSH Office/Muse',
+          '$appData/OpenMuse AI/Muse',
+        ]);
+      }
+      if (profile != null && profile.isNotEmpty) {
+        homes.add('$profile/AppData/Roaming/DSH Office/Muse');
+      }
+    } else if (Platform.isLinux) {
+      final home = Platform.environment['HOME']?.trim();
+      if (home != null && home.isNotEmpty) {
+        homes.addAll([
+          '$home/.local/share/muse',
+          '$home/.local/share/dsh-office/muse',
+        ]);
+      }
+    } else {
+      final home = Platform.environment['HOME']?.trim();
+      if (home != null && home.isNotEmpty) {
+        homes.addAll([
+          '$home/Library/Application Support/Muse',
+          '$home/Library/Application Support/AppFlowy/Muse',
+          '$home/Library/Application Support/DSH Office/Muse',
+          '$home/Library/Application Support/OpenMuse AI/Muse',
+        ]);
+      }
+    }
+    return homes;
+  }
+
+  static bool _dirHasEntries(Directory dir) {
+    try {
+      return dir.existsSync() && dir.listSync(followLinks: false).isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static void _copyDirectory(Directory source, Directory dest) {
+    dest.createSync(recursive: true);
+    for (final entity in source.listSync(recursive: true, followLinks: false)) {
+      final relative = entity.path.substring(source.path.length);
+      final targetPath = '${dest.path}$relative';
+      if (entity is Directory) {
+        Directory(targetPath).createSync(recursive: true);
+      } else if (entity is File) {
+        File(targetPath).parent.createSync(recursive: true);
+        entity.copySync(targetPath);
+      }
+    }
+  }
+
+  /// Move (or copy) the first non-empty legacy DSH data dir into [preferred].
+  static void _migrateLegacyUserMuseHome(String preferred) {
+    final dest = Directory(preferred);
+    if (_dirHasEntries(dest)) return;
+    for (final legacy in _legacyUserMuseHomes()) {
+      if (legacy == preferred) continue;
+      final src = Directory(legacy);
+      if (!_dirHasEntries(src)) continue;
+      try {
+        dest.parent.createSync(recursive: true);
+        src.renameSync(preferred);
+        return;
+      } catch (_) {
+        try {
+          _copyDirectory(src, dest);
+          return;
+        } catch (_) {}
+      }
+    }
   }
 
   static String get defaultDshHome {
@@ -163,7 +251,7 @@ class DshRuntimeLayout {
       if (beside.existsSync()) {
         throw StateError(
           'Packed Muse runtime at ${beside.path} is incomplete '
-          '(need patch.yml and closure/ or dsh/). Reinstall DSH Office.',
+          '(need patch.yml and closure/ or dsh/). Reinstall ${Brand.productName}.',
         );
       }
       throw StateError(

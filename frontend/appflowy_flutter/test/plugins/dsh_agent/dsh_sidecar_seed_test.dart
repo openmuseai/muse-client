@@ -122,4 +122,48 @@ void main() {
       DshSidecar.closureSeedGeneration(layout),
     );
   });
+
+  test('seeds the vendored bare-name plugin that patch.yml mounts', () {
+    // `name: dsh-model-capabilities` is not under the @muse scope and is not a
+    // dependency of dshmarket, so only an explicit seed root gets it into the
+    // profile. Without it the packed row resolves to nothing at boot.
+    final root = Directory.systemTemp.createTempSync('muse-seed-vendored-');
+    addTearDown(() => root.deleteSync(recursive: true));
+    File('${root.path}/patch.yml').writeAsStringSync(
+      '- insert:\n'
+      '    - id: model-capabilities\n'
+      '      name: dsh-model-capabilities\n',
+    );
+    File(
+      '${root.path}/closure/node_modules/@deepseek-ai/dsh/package.json',
+    )
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({'name': '@deepseek-ai/dsh', 'version': '1.0.0'}),
+      );
+    File(
+      '${root.path}/closure/node_modules/dsh-model-capabilities/package.json',
+    )
+      ..createSync(recursive: true)
+      ..writeAsStringSync(jsonEncode({'name': 'dsh-model-capabilities'}));
+    final dshHome = Directory('${root.path}/dsh-home')..createSync();
+    final layout = DshRuntimeLayout(
+      bundled: true,
+      museRoot: root.path,
+      dshHome: dshHome.path,
+      harnessDir: '${root.path}/closure',
+      patchFile: '${root.path}/patch.yml',
+      nodeBin: '${root.path}/node/node.exe',
+      credentialsFile: '${root.path}/credentials.env',
+      closureEntry:
+          '${root.path}/closure/node_modules/@deepseek-ai/dsh/lib/bin.js',
+    );
+    DshSidecar.seedClosurePlugins(layout);
+    expect(
+      File(
+        '${dshHome.path}/profiles/web/node_modules/dsh-model-capabilities/package.json',
+      ).existsSync(),
+      isTrue,
+    );
+  });
 }
