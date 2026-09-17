@@ -12,13 +12,18 @@ source "${SCRIPT_DIR}/lib/muse-macos.sh"
 ROOT="$(muse_root)"
 APK="${1:-}"
 if [[ -z "$APK" ]]; then
-  APK="$(muse_dist_dir)/android/dsh-office-android-debug.apk"
-  if [[ ! -f "$APK" ]]; then
-    APK="$(muse_dist_dir)/android/dsh-office-android-release.apk"
+  DIST_ANDROID="$(muse_dist_dir)/android"
+  CATALOG="$(ls -t "${DIST_ANDROID}/${BRAND_ARTIFACT_PREFIX}"-*-android-arm64.apk 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$CATALOG" && -f "$CATALOG" ]]; then
+    APK="$CATALOG"
+  elif [[ -f "${DIST_ANDROID}/${BRAND_ARTIFACT_PREFIX}-android-release.apk" ]]; then
+    APK="${DIST_ANDROID}/${BRAND_ARTIFACT_PREFIX}-android-release.apk"
+  else
+    APK="${DIST_ANDROID}/${BRAND_ARTIFACT_PREFIX}-android-debug.apk"
   fi
 fi
 if [[ ! -f "$APK" ]]; then
-  echo "APK not found: $APK (run frontend/client/scripts/build-android-client.sh first)" >&2
+  echo "APK not found: $APK (run frontend/client/scripts/pack-android-client.py first)" >&2
   exit 1
 fi
 if ! command -v adb >/dev/null 2>&1; then

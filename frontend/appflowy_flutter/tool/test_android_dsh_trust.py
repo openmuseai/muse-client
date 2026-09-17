@@ -76,10 +76,12 @@ class DshDebugTrustTest(unittest.TestCase):
         )
 
     def test_webview_keeps_rejecting_invalid_tls(self):
-        page = (FLUTTER / "lib/plugins/dsh_agent/dsh_mobile_agent_page.dart").read_text()
-        self.assertIn("onSslAuthError:", page)
-        self.assertIn("error.cancel()", page)
-        self.assertNotIn(".proceed()", page)
+        manager = (FLUTTER.parents[3] / "middlewares/dsh/mobile/muse-dsh-mobile/lib/src/webview/dsh_webview_manager.dart").read_text()
+        helper = (FLUTTER.parents[3] / "middlewares/dsh/mobile/muse-dsh-mobile/lib/src/webview/dsh_ssl_auth.dart").read_text()
+        self.assertIn("onSslAuthError:", manager)
+        self.assertIn("error.cancel()", helper)
+        self.assertIn("dshSystemTrustHandshake", helper)
+        self.assertIn("badCertificateCallback = (cert, host, port) => false", helper)
 
 
 if __name__ == "__main__":

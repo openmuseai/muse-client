@@ -159,7 +159,7 @@ if [[ "$SIMULATOR" == true ]]; then
     echo "expected simulator app missing: $APP" >&2
     exit 1
   fi
-  DEST_APP="$DEST_DIR/dsh-office-ios-simulator-debug.app"
+  DEST_APP="$DEST_DIR/${BRAND_ARTIFACT_PREFIX}-ios-simulator-debug.app"
   rm -rf "$DEST_APP"
   ditto "$APP" "$DEST_APP"
   echo "Built $DEST_APP (simulator; libdart_ffi.a present)"
@@ -172,7 +172,7 @@ if [[ "$MODE" == release && "$CODESIGN" == true ]]; then
     echo "expected signed IPA missing under $FLUTTER_DIR/build/ios/ipa" >&2
     exit 1
   fi
-  DEST="$DEST_DIR/dsh-office-ios-release.ipa"
+  DEST="$DEST_DIR/${BRAND_ARTIFACT_PREFIX}-ios-release.ipa"
   cp "$IPA" "$DEST"
   echo "Built $DEST (device; signed IPA; libdart_ffi.a present)"
   exit 0
@@ -183,9 +183,9 @@ if [[ ! -d "$APP" ]]; then
   echo "expected device app missing: $APP" >&2
   exit 1
 fi
-DEST_APP="$DEST_DIR/dsh-office-ios-${MODE}.app"
+DEST_APP="$DEST_DIR/${BRAND_ARTIFACT_PREFIX}-ios-${MODE}.app"
 rm -rf "$DEST_APP"
 ditto "$APP" "$DEST_APP"
-DEST_IPA="$DEST_DIR/dsh-office-ios-${MODE}.ipa"
+DEST_IPA="$DEST_DIR/${BRAND_ARTIFACT_PREFIX}-ios-${MODE}.ipa"
 pack_unsigned_ipa "$DEST_APP" "$DEST_IPA"
 echo "Built $DEST_APP and $DEST_IPA (device arm64; unsigned sideload IPA; libdart_ffi.a present)"

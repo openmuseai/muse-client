@@ -13,9 +13,9 @@ source "${SCRIPT_DIR}/lib/muse-macos.sh"
 ROOT="$(muse_root)"
 APP="${1:-}"
 if [[ -z "$APP" ]]; then
-  APP="$(muse_dist_dir)/ios/dsh-office-ios-simulator-debug.app"
+  APP="$(muse_dist_dir)/ios/${BRAND_ARTIFACT_PREFIX}-ios-simulator-debug.app"
   if [[ ! -d "$APP" ]]; then
-    APP="$(muse_dist_dir)/ios/dsh-office-ios-debug.app"
+    APP="$(muse_dist_dir)/ios/${BRAND_ARTIFACT_PREFIX}-ios-debug.app"
   fi
 fi
 if [[ ! -d "$APP" ]]; then

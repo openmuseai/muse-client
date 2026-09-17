@@ -11,6 +11,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/muse-macos.sh
 source "${SCRIPT_DIR}/lib/muse-macos.sh"
+# shellcheck source=lib/android-cargokit.sh
+source "${SCRIPT_DIR}/lib/android-cargokit.sh"
 
 MODE=debug
 SKIP_PACKAGES=false
@@ -121,6 +123,10 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   "$(muse_script_build_packages)" --skip-tests
 fi
 
+# irondash 0.5.5 CargoKit does not attach to the legacy Flutter Gradle plugin.
+# Build that cdylib (and super_native if needed) into app jniLibs before APK.
+muse_android_ensure_plugin_cdylibs
+
 if [[ "$SKIP_CORE" == false ]]; then
   echo "==> Building rust-lib for Android ($PROFILE, cargo-ndk arm64-v8a)"
   (
@@ -129,8 +135,11 @@ if [[ "$SKIP_CORE" == false ]]; then
   )
 else
   echo "==> Skipping cargo make; flutter build apk only"
-  bash "$(muse_script_build_mobile_apk)" "$MODE"
 fi
+
+# rust-lib copy wipes plugin jni; restage then produce the APK that pack verifies.
+muse_android_stage_pack_jni
+bash "$(muse_script_build_mobile_apk)" "$MODE"
 
 APK="$FLUTTER_DIR/build/app/outputs/flutter-apk/app-arm64-v8a-${MODE}.apk"
 if [[ ! -f "$APK" ]]; then
@@ -150,6 +159,6 @@ done
 DEST_DIR="$(muse_dist_dir)/android"
 mkdir -p "$DEST_DIR"
 PACKAGE_SUFFIX="${MUSE_ANDROID_APPLICATION_ID:+-${MUSE_ANDROID_APPLICATION_ID}}"
-DEST="$DEST_DIR/dsh-office-android-${MODE}${PACKAGE_SUFFIX}.apk"
+DEST="$DEST_DIR/${BRAND_ARTIFACT_PREFIX}-android-${MODE}${PACKAGE_SUFFIX}.apk"
 cp "$APK" "$DEST"
 echo "Built $DEST (arm64-v8a; Rust FFI verified)"
