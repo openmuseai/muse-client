@@ -50,3 +50,12 @@ frontend/appflowy_flutter/android/app/src/main/jniLibs/
 /dist/
 **/~
 **/build/
+
+# 引擎运行时资源：由 frontend/appflowy_flutter/tool/build_macos_engine_assets.sh
+# 从 vendors/helix 与 vendors/open-file-viewer 现场生成（含 hx 二进制与
+# viewer.js 打包产物），不入库以免把 57MB 可再生二进制写进历史。
+frontend/appflowy_flutter/assets/engines/
+
+# Python 字节码缓存
+**/__pycache__/
+*.pyc
