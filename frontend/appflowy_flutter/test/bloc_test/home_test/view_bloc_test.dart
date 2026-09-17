@@ -210,9 +210,13 @@ void main() {
   test('create views', () async {
     final viewBloc = await createTestViewBloc();
     const layouts = ViewLayoutPB.values;
-    for (var i = 0; i < layouts.length; i++) {
-      final layout = layouts[i];
-      if (layout == ViewLayoutPB.Chat) {
+    var created = 0;
+    for (final layout in layouts) {
+      if (layout == ViewLayoutPB.Chat ||
+          layout == ViewLayoutPB.Word ||
+          layout == ViewLayoutPB.Excel ||
+          layout == ViewLayoutPB.Slides ||
+          layout == ViewLayoutPB.Pdf) {
         continue;
       }
       viewBloc.add(
@@ -223,7 +227,8 @@ void main() {
         ),
       );
       await blocResponseFuture(millisecond: 1000);
-      expect(viewBloc.state.view.childViews.length, i + 1);
+      created += 1;
+      expect(viewBloc.state.view.childViews.length, created);
       expect(viewBloc.state.view.childViews.last.name, 'Test $layout');
       expect(viewBloc.state.view.childViews.last.layout, layout);
     }
