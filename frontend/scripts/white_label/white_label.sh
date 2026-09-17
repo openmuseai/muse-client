@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default values
-APP_NAME="DSH Office"
+APP_NAME="OpenMuse"
 APP_IDENTIFIER="com.openmuseai.dshoffice"
 COMPANY_NAME="OpenMuseAI"
 COPYRIGHT="Copyright © 2026 OpenMuseAI contributors"
