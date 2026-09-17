@@ -15,16 +15,27 @@ class FlowyPluginService {
   static FlowyPluginService get instance => _instance;
 
   PluginLocationService _locationService = PluginLocationService(
-    fallback: getApplicationDocumentsDirectory(),
+    fallback: getApplicationSupportDirectory().then((dir) {
+      final plugins = Directory(p.join(dir.path, 'plugins'));
+      plugins.createSync(recursive: true);
+      return plugins;
+    }),
   );
 
   void setLocation(PluginLocationService locationService) =>
       _locationService = locationService;
 
   Future<Iterable<Directory>> get _targets async {
-    final location = await _locationService.location;
-    final targets = location.listSync().where(FlowyDynamicPlugin.isPlugin);
-    return targets.map<Directory>((entity) => entity as Directory).toList();
+    try {
+      final location = await _locationService.location;
+      if (!location.existsSync()) {
+        return const <Directory>[];
+      }
+      final targets = location.listSync().where(FlowyDynamicPlugin.isPlugin);
+      return targets.map<Directory>((entity) => entity as Directory).toList();
+    } catch (_) {
+      return const <Directory>[];
+    }
   }
 
   /// Searches the [PluginLocationService.location] for plugins and compiles them.

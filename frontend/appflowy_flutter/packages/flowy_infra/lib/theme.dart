@@ -57,8 +57,16 @@ class AppTheme {
     String themeName, {
     FlowyPluginService? pluginService,
   }) async {
+    // Built-in themes must resolve without touching the filesystem. On macOS,
+    // FlowyPluginService lists ~/Documents, and a TCC / iCloud hang there
+    // blocks runApp — the window stays blank.
+    for (final theme in builtins) {
+      if (theme.themeName == themeName) {
+        return theme;
+      }
+    }
     pluginService ??= FlowyPluginService.instance;
-    for (final theme in await themes(pluginService)) {
+    for (final theme in await _plugins(pluginService)) {
       if (theme.themeName == themeName) {
         return theme;
       }
