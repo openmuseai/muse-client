@@ -101,6 +101,20 @@ class SettingsMenu extends StatelessWidget {
               changeSelectedPage: changeSelectedPage,
             ),
             SettingsMenuElement(
+              page: SettingsPage.plugins,
+              selectedPage: currentPage,
+              label: 'Plugin',
+              icon: const Icon(Icons.extension_outlined, size: 20),
+              changeSelectedPage: changeSelectedPage,
+            ),
+            SettingsMenuElement(
+              page: SettingsPage.agent,
+              selectedPage: currentPage,
+              label: 'Agent',
+              icon: const Icon(Icons.smart_toy_outlined, size: 20),
+              changeSelectedPage: changeSelectedPage,
+            ),
+            SettingsMenuElement(
               page: SettingsPage.ai,
               selectedPage: currentPage,
               label: LocaleKeys.settings_aiPage_menuLabel.tr(),

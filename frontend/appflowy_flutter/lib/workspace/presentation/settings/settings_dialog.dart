@@ -13,6 +13,8 @@ import 'package:appflowy/workspace/presentation/settings/pages/settings_account_
 import 'package:appflowy/workspace/presentation/settings/pages/settings_billing_view.dart';
 import 'package:appflowy/workspace/presentation/settings/pages/settings_manage_data_view.dart';
 import 'package:appflowy/workspace/presentation/settings/pages/settings_plan_view.dart';
+import 'package:appflowy/workspace/presentation/settings/pages/settings_agent_view.dart';
+import 'package:appflowy/workspace/presentation/settings/pages/settings_plugins_view.dart';
 import 'package:appflowy/workspace/presentation/settings/pages/settings_shortcuts_view.dart';
 import 'package:appflowy/workspace/presentation/settings/pages/settings_workspace_view.dart';
 import 'package:appflowy/workspace/presentation/settings/pages/sites/settings_sites_view.dart';
@@ -147,6 +149,10 @@ class SettingsDialog extends StatelessWidget {
         return SettingCloud(restartAppFlowy: () => restartApp());
       case SettingsPage.shortcuts:
         return const SettingsShortcutsView();
+      case SettingsPage.plugins:
+        return const SettingsPluginsView();
+      case SettingsPage.agent:
+        return const SettingsAgentView();
       case SettingsPage.ai:
         if (user.workspaceType == WorkspaceTypePB.ServerW) {
           return SettingsAIView(
