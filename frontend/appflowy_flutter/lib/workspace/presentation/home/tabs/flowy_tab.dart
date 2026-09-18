@@ -39,19 +39,24 @@ class _FlowyTabState extends State<FlowyTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: widget.pageManager.isPinned ? 54 : null,
+    final pinned = widget.pageManager.isPinned;
+    final current = widget.isCurrent;
+    return ConstrainedBox(
+      constraints: pinned
+          ? const BoxConstraints.tightFor(width: 54)
+          : current
+              ? const BoxConstraints(minWidth: 128)
+              : const BoxConstraints(minWidth: 88, maxWidth: 168),
       child: _wrapInTooltip(
         widget.pageManager.plugin.widgetBuilder.viewName,
         child: FlowyHover(
           resetHoverOnRebuild: false,
           style: HoverStyle(
             borderRadius: BorderRadius.zero,
-            backgroundColor: widget.isCurrent
+            backgroundColor: current
                 ? Theme.of(context).colorScheme.surface
                 : Theme.of(context).colorScheme.surfaceContainerHighest,
-            hoverColor:
-                widget.isCurrent ? Theme.of(context).colorScheme.surface : null,
+            hoverColor: current ? Theme.of(context).colorScheme.surface : null,
           ),
           builder: (context, isHovering) => AppFlowyPopover(
             controller: controller,
@@ -64,7 +69,7 @@ class _FlowyTabState extends State<FlowyTab> {
                 controller: controller,
                 pageId: widget.pageManager.plugin.id,
                 plugin: widget.pageManager.plugin,
-                isPinned: widget.pageManager.isPinned,
+                isPinned: pinned,
                 isAllPinned: widget.isAllPinned,
               ),
             ),
@@ -72,8 +77,9 @@ class _FlowyTabState extends State<FlowyTab> {
               value: widget.pageManager.notifier,
               child: Consumer<PageNotifier>(
                 builder: (context, value, _) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  // We use a Listener to avoid gesture detector onPanStart debounce
+                  padding: EdgeInsets.symmetric(
+                    horizontal: current ? 14.0 : 10.0,
+                  ),
                   child: Listener(
                     onPointerDown: (event) {
                       if (event.buttons == kPrimaryButton) {
@@ -82,27 +88,28 @@ class _FlowyTabState extends State<FlowyTab> {
                     },
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      // Stop move window detector
                       onPanStart: (_) {},
-                      child: Container(
-                        constraints: BoxConstraints(
-                          maxWidth: HomeSizes.tabBarWidth,
-                          minWidth: widget.pageManager.isPinned ? 54 : 100,
-                        ),
+                      child: SizedBox(
                         height: HomeSizes.tabBarHeight,
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Flexible(
-                              child: widget.pageManager.notifier.tabBarWidget(
+                            if (current)
+                              widget.pageManager.notifier.tabBarWidget(
                                 widget.pageManager.plugin.id,
-                                widget.pageManager.isPinned,
+                                pinned,
+                              )
+                            else
+                              Flexible(
+                                child: widget.pageManager.notifier.tabBarWidget(
+                                  widget.pageManager.plugin.id,
+                                  pinned,
+                                ),
                               ),
-                            ),
                             if (widget.pageManager.plugin
                                 is PluginTabMenuContributor)
                               Visibility(
-                                visible: isHovering || widget.isCurrent,
+                                visible: isHovering || current,
                                 child: SizedBox(
                                   width: 24,
                                   height: 26,
@@ -114,9 +121,9 @@ class _FlowyTabState extends State<FlowyTab> {
                                   ),
                                 ),
                               ),
-                            if (!widget.pageManager.isPinned) ...[
+                            if (!pinned) ...[
                               Visibility(
-                                visible: isHovering || widget.isCurrent,
+                                visible: isHovering || current,
                                 child: SizedBox(
                                   width: 26,
                                   height: 26,
