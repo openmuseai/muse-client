@@ -44,20 +44,21 @@ class FlowyNavigation extends StatelessWidget {
         );
       },
       update: (_, notifier, controller) => controller!..update(notifier),
-      child: Expanded(
-        child: Row(
-          children: [
-            _renderCollapse(context),
-            Selector<NavigationNotifier, List<NavigationItem>>(
-              selector: (context, notifier) => notifier.navigationItems,
-              builder: (ctx, items, child) => Expanded(
+      child: Row(
+        children: [
+          _renderCollapse(context),
+          Selector<NavigationNotifier, List<NavigationItem>>(
+            selector: (context, notifier) => notifier.navigationItems,
+            builder: (ctx, items, child) {
+              if (items.isEmpty) return const SizedBox.shrink();
+              return Expanded(
                 child: Row(
                   children: _renderNavigationItems(items),
                 ),
-              ),
-            ),
-          ],
-        ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

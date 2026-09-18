@@ -16,7 +16,6 @@ import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
 import 'package:appflowy/workspace/presentation/home/navigation.dart';
 import 'package:appflowy/workspace/presentation/home/tabs/tabs_manager.dart';
 import 'package:appflowy/workspace/presentation/home/toast.dart';
-import 'package:appflowy/plugins/dsh_agent/dsh_agent_toggle.dart';
 import 'package:appflowy_backend/dispatch/dispatch.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
@@ -817,32 +816,39 @@ class _HomeTopBarState extends State<HomeTopBar>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final notifier = Provider.of<PageNotifier>(context, listen: false);
+    final showTitle = notifier.plugin.widgetBuilder.showNavigationTitle;
+    final height = showTitle
+        ? HomeSizes.topBarHeight + HomeInsets.topBarTitleVerticalPadding
+        : 32.0;
 
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
       ),
-      height: HomeSizes.topBarHeight + HomeInsets.topBarTitleVerticalPadding,
+      height: height,
       child: Padding(
-        padding: const EdgeInsets.symmetric(
+        padding: EdgeInsets.symmetric(
           horizontal: HomeInsets.topBarTitleHorizontalPadding,
-          vertical: HomeInsets.topBarTitleVerticalPadding,
+          vertical: showTitle ? HomeInsets.topBarTitleVerticalPadding : 4,
         ),
         child: Row(
           children: [
             HSpace(widget.layout.menuSpacing),
-            const FlowyNavigation(),
-            const HSpace(16),
+            if (showTitle)
+              const Expanded(child: FlowyNavigation())
+            else
+              const FlowyNavigation(),
+            if (showTitle) const HSpace(16),
             ChangeNotifierProvider.value(
-              value: Provider.of<PageNotifier>(context, listen: false),
+              value: notifier,
               child: Consumer(
-                builder: (_, PageNotifier notifier, __) =>
-                    notifier.plugin.widgetBuilder.rightBarItem ??
+                builder: (_, PageNotifier page, __) =>
+                    page.plugin.widgetBuilder.rightBarItem ??
                     const SizedBox.shrink(),
               ),
             ),
             const Spacer(),
-            const DshAgentToggle(),
             const HSpace(8),
           ],
         ),

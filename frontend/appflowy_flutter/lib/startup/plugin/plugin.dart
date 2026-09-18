@@ -102,6 +102,10 @@ abstract class PluginConfig {
 abstract class PluginWidgetBuilder with NavigationItem {
   List<NavigationItem> get navigationItems;
 
+  /// Filename strip under the tab list. Resource and diff tabs already show
+  /// the name on the tab itself, so they hide this Host chrome.
+  bool get showNavigationTitle => true;
+
   EdgeInsets get contentPadding =>
       const EdgeInsets.symmetric(horizontal: 40, vertical: 28);
 
