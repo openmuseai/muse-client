@@ -131,4 +131,7 @@ class KVKeys {
 
   /// Desktop DSH agent panel width in logical pixels.
   static const String dshPanelWidth = 'muse.dshPanelWidth';
+
+  /// Helix editor plugin settings (theme, keymap, font, background, LSP).
+  static const String helixSettings = 'muse.helixSettings';
 }

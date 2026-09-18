@@ -18,6 +18,8 @@ import 'package:appflowy/user/application/reminder/reminder_bloc.dart';
 import 'package:appflowy/user/application/user_listener.dart';
 import 'package:appflowy/user/presentation/router.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_agent_controller.dart';
+import 'package:appflowy/plugins/resource_surface/helix/helix_language_servers.dart';
+import 'package:appflowy/plugins/resource_surface/helix/helix_settings.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_action_registry.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_actions.dart';
 import 'package:appflowy/plugins/version_diff/application/text_version_diff_service.dart';
@@ -259,6 +261,12 @@ void _resolveHomeDeps(GetIt getIt) {
   final resourceTabActions = MuseResourceTabActionRegistry();
   registerDefaultMuseResourceTabActions(resourceTabActions);
   getIt.registerSingleton<MuseResourceTabActionRegistry>(resourceTabActions);
+  getIt.registerLazySingleton<HelixLanguageServerInstaller>(
+    HelixLanguageServerInstaller.new,
+  );
+  getIt.registerLazySingleton<HelixSettingsController>(
+    () => HelixSettingsController(getIt<HelixLanguageServerInstaller>()),
+  );
   getIt.registerLazySingleton<DshSidecar>(
     () => DshSidecar(getIt<DshAgentController>()),
     dispose: (sidecar) async {
