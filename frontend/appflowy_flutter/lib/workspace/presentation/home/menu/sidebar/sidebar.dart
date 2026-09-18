@@ -32,6 +32,7 @@ import 'package:appflowy/workspace/presentation/home/menu/sidebar/header/sidebar
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/header/sidebar_user.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar_folder.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar_new_page_button.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar_stack_panes.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/space/sidebar_space.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/space/space_migration.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/workspace/sidebar_workspace.dart';
@@ -310,9 +311,6 @@ class _SidebarState extends State<_Sidebar> {
   final _scrollOffset = ValueNotifier<double>(0);
 
   // mute the update button during the current application lifecycle.
-  bool _projectExpanded = true;
-  bool _personalExpanded = true;
-  bool _preferPersonal = false;
   final _muteUpdateButton = ValueNotifier(false);
 
   @override
@@ -425,121 +423,64 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  static const _headerReserve = 96.0;
-  static const _minSharedBody = 320.0;
-
-  bool _roomForBoth(double height) =>
-      height >= _headerReserve + _minSharedBody;
-
-  void _setProjectExpanded(bool expanded, double height) {
-    setState(() {
-      _preferPersonal = false;
-      _projectExpanded = expanded;
-      if (expanded && !_roomForBoth(height)) {
-        _personalExpanded = false;
-      }
-    });
-  }
-
-  void _setPersonalExpanded(bool expanded, double height) {
-    setState(() {
-      _preferPersonal = true;
-      _personalExpanded = expanded;
-      if (expanded && !_roomForBoth(height)) {
-        _projectExpanded = false;
-      }
-    });
-  }
-
-  void _reconcileHeight(double height) {
-    if (!_projectExpanded || !_personalExpanded || _roomForBoth(height)) {
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (!_projectExpanded || !_personalExpanded || _roomForBoth(height)) {
-        return;
-      }
-      setState(() {
-        if (_preferPersonal) {
-          _projectExpanded = false;
-        } else {
-          _personalExpanded = false;
-        }
-      });
-    });
-  }
-
   Widget _renderWorkspaceAndKnowledge(EdgeInsets menuHorizontalInset) {
     final workspace = context.read<UserWorkspaceBloc>().state.currentWorkspace;
     return Expanded(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          _reconcileHeight(constraints.maxHeight);
-          final project = Padding(
-            padding: menuHorizontalInset,
-            child: MuseWorkspaceExplorer(
-              accountSpaceRef: workspace?.workspaceId ?? 'default',
-              accountSpaceTitle: workspace?.name ?? 'Workspace',
-              expanded: _projectExpanded,
-              fillRemaining: _projectExpanded,
-              onExpandedChanged: (expanded) =>
-                  _setProjectExpanded(expanded, constraints.maxHeight),
-            ),
-          );
-          final personal = _renderFolderOrSpaceBody(
-            menuHorizontalInset,
-            expanded: _personalExpanded,
-            fillRemaining: _personalExpanded,
-            onExpandedChanged: (expanded) =>
-                _setPersonalExpanded(expanded, constraints.maxHeight),
-          );
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_projectExpanded) Expanded(child: project) else project,
-              const VSpace(12),
-              Padding(
-                padding: menuHorizontalInset +
-                    const EdgeInsets.symmetric(horizontal: 4),
-                child: const FlowyDivider(),
+      child: Padding(
+        padding: menuHorizontalInset,
+        child: SidebarStackPanes(
+          panes: [
+            SidebarStackPane(
+              id: 'project',
+              builder: (context, slot) => MuseWorkspaceExplorer(
+                accountSpaceRef: workspace?.workspaceId ?? 'default',
+                accountSpaceTitle: workspace?.name ?? 'Workspace',
+                expanded: slot.expanded,
+                fillRemaining: slot.fillRemaining,
+                onExpandedChanged: slot.onToggle,
+                onContentHeight: slot.onContentHeight,
+                onActivate: slot.onActivate,
               ),
-              const VSpace(8),
-              if (_personalExpanded) Expanded(child: personal) else personal,
-            ],
-          );
-        },
+            ),
+            SidebarStackPane(
+              id: 'personal',
+              builder: (context, slot) => _renderFolderOrSpaceBody(
+                expanded: slot.expanded,
+                fillRemaining: slot.fillRemaining,
+                onExpandedChanged: slot.onToggle,
+                onContentHeight: slot.onContentHeight,
+                onActivate: slot.onActivate,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _renderFolderOrSpaceBody(
-    EdgeInsets menuHorizontalInset, {
+  Widget _renderFolderOrSpaceBody({
     required bool expanded,
     required bool fillRemaining,
     required ValueChanged<bool> onExpandedChanged,
+    required ValueChanged<double> onContentHeight,
+    required VoidCallback onActivate,
   }) {
     final spaceState = context.read<SpaceBloc>().state;
     final workspaceState = context.read<UserWorkspaceBloc>().state;
-
-    if (!spaceState.isInitialized) {
-      return const SizedBox.shrink();
-    }
-
-    // there's no space or the workspace is not collaborative,
-    // show the folder section (Workspace, Private, Personal)
-    // otherwise, show the space
     final sidebarSectionBloc = context.watch<SidebarSectionsBloc>();
     final containsSpace = sidebarSectionBloc.state.containsSpace;
 
-    if (containsSpace && spaceState.spaces.isEmpty) {
+    if (containsSpace && spaceState.spaces.isEmpty && spaceState.isInitialized) {
       context.read<SpaceBloc>().add(const SpaceEvent.didReceiveSpaceUpdate());
     }
 
-    final padding = menuHorizontalInset - const EdgeInsets.only(right: 6);
-    if (!containsSpace ||
+    final padding = const EdgeInsets.only(right: 6);
+    final showFolder = !spaceState.isInitialized ||
+        !containsSpace ||
         spaceState.spaces.isEmpty ||
-        !workspaceState.isCollabWorkspaceOn) {
+        !workspaceState.isCollabWorkspaceOn;
+
+    if (showFolder) {
       return Padding(
         padding: padding,
         child: SidebarFolder(
@@ -549,30 +490,23 @@ class _SidebarState extends State<_Sidebar> {
           expanded: expanded,
           fillRemaining: fillRemaining,
           onExpandedChanged: onExpandedChanged,
+          onContentHeight: onContentHeight,
+          onActivate: onActivate,
         ),
       );
     }
 
     final space = Padding(
       padding: padding,
-      child: FlowyScrollbar(
-        controller: _scrollController,
-        child: ListView(
-          shrinkWrap: !fillRemaining,
-          padding: const EdgeInsets.only(right: 6),
-          controller: _scrollController,
-          physics: const ClampingScrollPhysics(),
-          children: [
-            SidebarSpace(
-              userProfile: widget.userProfile,
-              isHoverEnabled: !_isScrolling,
-              includeBottomSpacer: false,
-            ),
-          ],
-        ),
+      child: SidebarSpace(
+        userProfile: widget.userProfile,
+        isHoverEnabled: !_isScrolling,
+        includeBottomSpacer: false,
       ),
     );
-    if (expanded) return space;
+    if (expanded) {
+      return fillRemaining ? SingleChildScrollView(child: space) : space;
+    }
     return GestureDetector(
       onTap: () => onExpandedChanged(true),
       child: SizedBox(

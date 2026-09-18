@@ -4,6 +4,7 @@ import 'package:appflowy/workspace/application/sidebar/folder/folder_bloc.dart';
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/folder/_folder_header.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar_stack_panes.dart';
 import 'package:appflowy/workspace/presentation/home/menu/view/view_item.dart';
 import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -23,6 +24,8 @@ class SectionFolder extends StatefulWidget {
     this.expanded,
     this.onExpandedChanged,
     this.fillRemaining = false,
+    this.onContentHeight,
+    this.onActivate,
   });
 
   final String title;
@@ -34,6 +37,8 @@ class SectionFolder extends StatefulWidget {
   final bool? expanded;
   final ValueChanged<bool>? onExpandedChanged;
   final bool fillRemaining;
+  final ValueChanged<double>? onContentHeight;
+  final VoidCallback? onActivate;
 
   @override
   State<SectionFolder> createState() => _SectionFolderState();
@@ -60,31 +65,29 @@ class _SectionFolderState extends State<SectionFolder> {
           builder: (context, state) {
             final expanded = widget.expanded ?? state.isExpanded;
             final views = _buildViews(context, expanded, isHovered);
+            final list = Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ...views,
+                _buildDraggablePlaceholder(context),
+              ],
+            );
             return Column(
-              mainAxisSize:
-                  widget.fillRemaining ? MainAxisSize.max : MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildHeader(context, expanded),
                 if (expanded) const VSpace(4.0),
                 if (expanded)
-                  widget.fillRemaining
-                      ? Expanded(
-                          child: ListView(
-                            padding: EdgeInsets.zero,
-                            children: [
-                              ...views,
-                              _buildDraggablePlaceholder(context),
-                            ],
-                          ),
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ...views,
-                            _buildDraggablePlaceholder(context),
-                          ],
-                        ),
+                  SidebarContentHeightReporter(
+                    onHeight: (height) => widget.onContentHeight?.call(height),
+                    child: list,
+                  )
+                else
+                  SidebarContentHeightReporter(
+                    onHeight: (height) => widget.onContentHeight?.call(0),
+                    child: const SizedBox.shrink(),
+                  ),
               ],
             );
           },
@@ -101,6 +104,7 @@ class _SectionFolderState extends State<SectionFolder> {
       addButtonTooltip: widget.addButtonTooltip,
       onPressed: () {
         final next = !expanded;
+        widget.onActivate?.call();
         final onChanged = widget.onExpandedChanged;
         if (onChanged != null) {
           onChanged(next);

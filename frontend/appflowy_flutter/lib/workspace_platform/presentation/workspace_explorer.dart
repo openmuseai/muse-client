@@ -13,6 +13,7 @@ import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
 import 'package:appflowy/workspace/presentation/widgets/dialog_v2.dart';
 import 'package:appflowy/workspace_platform/application/workspace_controller.dart';
 import 'package:appflowy/workspace_platform/domain/workspace_models.dart';
+import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar_stack_panes.dart';
 import 'package:flowy_infra/file_picker/file_picker_service.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +27,8 @@ final class MuseWorkspaceExplorer extends StatefulWidget {
     this.expanded,
     this.onExpandedChanged,
     this.fillRemaining = false,
+    this.onContentHeight,
+    this.onActivate,
   });
 
   final String accountSpaceRef;
@@ -33,6 +36,8 @@ final class MuseWorkspaceExplorer extends StatefulWidget {
   final bool? expanded;
   final ValueChanged<bool>? onExpandedChanged;
   final bool fillRemaining;
+  final ValueChanged<double>? onContentHeight;
+  final VoidCallback? onActivate;
 
   @override
   State<MuseWorkspaceExplorer> createState() => _MuseWorkspaceExplorerState();
@@ -55,6 +60,9 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
     if (oldWidget.accountSpaceRef != widget.accountSpaceRef ||
         oldWidget.accountSpaceTitle != widget.accountSpaceTitle) {
       unawaited(_open());
+    }
+    if ((oldWidget.expanded ?? true) && widget.expanded == false) {
+      widget.onContentHeight?.call(0);
     }
   }
 
@@ -93,6 +101,12 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
               : hasMounts
                   ? _buildTree(context)
                   : _buildEmpty(context);
+          final measured = _expanded
+              ? SidebarContentHeightReporter(
+                  onHeight: (height) => widget.onContentHeight?.call(height),
+                  child: body,
+                )
+              : body;
           return Column(
             mainAxisSize:
                 widget.fillRemaining ? MainAxisSize.max : MainAxisSize.min,
@@ -103,11 +117,9 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
               if (_expanded)
                 widget.fillRemaining
                     ? Expanded(
-                        child: FlowyScrollbar(
-                          child: SingleChildScrollView(child: body),
-                        ),
+                        child: SingleChildScrollView(child: measured),
                       )
-                    : body,
+                    : measured,
             ],
           );
         },
@@ -199,6 +211,7 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
   Future<void> _openEntry(MuseWorkspaceEntry entry) async {
     _controller.select(entry.entryRef);
     if (entry.isDirectory) {
+      widget.onActivate?.call();
       await _controller.toggleExpanded(entry);
       return;
     }
