@@ -4,12 +4,14 @@ import 'dart:io';
 import 'package:appflowy/plugins/resource_surface/resource_surface_session.dart';
 import 'package:appflowy/plugins/version_diff/application/text_version_diff_service.dart';
 import 'package:appflowy/plugins/version_diff/domain/version_diff_contract.dart';
-import 'package:appflowy/plugins/version_diff/presentation/text_diff_viewer.dart';
+import 'package:appflowy/plugins/version_diff/presentation/text_diff_plugin.dart';
 import 'package:appflowy/startup/startup.dart';
+import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
 
 /// Per-file session for the resource-tab version pane.
 final class MuseResourceVersionPaneController extends ChangeNotifier {
@@ -25,8 +27,6 @@ final class MuseResourceVersionPaneController extends ChangeNotifier {
   String? error;
   List<MuseVersion> versions = const [];
   MuseVersion? selected;
-  MuseTextComparisonDocument? document;
-  MuseDiffLayout layout = MuseDiffLayout.unified;
 
   bool get showingCurrent => selected == null;
 
@@ -43,7 +43,6 @@ final class MuseResourceVersionPaneController extends ChangeNotifier {
   void hide() {
     open = false;
     selected = null;
-    document = null;
     notifyListeners();
   }
 
@@ -82,51 +81,59 @@ final class MuseResourceVersionPaneController extends ChangeNotifier {
 
   Future<void> selectCurrent() async {
     selected = null;
-    document = null;
-    layout = MuseDiffLayout.unified;
     notifyListeners();
   }
 
   Future<void> selectVersion(MuseVersion version) async {
+    await _openDiffTab(version: version, compare: false);
+  }
+
+  Future<void> compareWithCurrent(MuseVersion version) async {
+    await _openDiffTab(version: version, compare: true);
+  }
+
+  Future<void> _openDiffTab({
+    required MuseVersion version,
+    required bool compare,
+  }) async {
     loading = true;
     selected = version;
-    layout = MuseDiffLayout.unified;
     notifyListeners();
     try {
       await _stashUncommitted(message: '自动保存');
       versions = await _service.repository.listCommitted(file);
-      document = await _service.viewVersionChanges(file, version);
+      final document = compare
+          ? await _compareDocument(version)
+          : await _service.viewVersionChanges(file, version);
       error = null;
+      getIt<TabsBloc>().openExternalPlugin(
+        compare
+            ? MuseTextDiffPlugin.compare(
+                document: document,
+                fileName: p.basename(file.path),
+              )
+            : MuseTextDiffPlugin.view(
+                document: document,
+                fileName: p.basename(file.path),
+              ),
+      );
     } on Object catch (err) {
       error = err.toString();
-      document = null;
     }
     loading = false;
     notifyListeners();
   }
 
-  Future<void> compareWithCurrent(MuseVersion version) async {
-    loading = true;
-    selected = version;
-    layout = MuseDiffLayout.split;
-    notifyListeners();
-    try {
-      await _stashUncommitted(message: '自动保存');
-      versions = await _service.repository.listCommitted(file);
-      final working = await _service.snapshotWorking(file);
-      final latest = versions.isEmpty ? null : versions.last;
-      final current =
-          latest != null && latest.contentDigest == working.contentDigest
-              ? latest
-              : working;
-      document = await _service.compareVersions(file, version, current);
-      error = null;
-    } on Object catch (err) {
-      error = err.toString();
-      document = null;
-    }
-    loading = false;
-    notifyListeners();
+  Future<MuseTextComparisonDocument> _compareDocument(
+    MuseVersion version,
+  ) async {
+    final working = await _service.snapshotWorking(file);
+    final latest = versions.isEmpty ? null : versions.last;
+    final current =
+        latest != null && latest.contentDigest == working.contentDigest
+            ? latest
+            : working;
+    return _service.compareVersions(file, version, current);
   }
 }
 

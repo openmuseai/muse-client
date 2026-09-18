@@ -6,7 +6,6 @@ import 'package:appflowy/plugins/version_diff/text/text_diff_models.dart';
 import 'package:appflowy/plugins/version_diff/text/text_diff_presentation.dart';
 import 'package:appflowy/plugins/version_diff/text/text_diff_sync.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 
 enum MuseDiffLayout { unified, split }
 
@@ -432,140 +431,156 @@ final class _MuseTextDiffViewerState extends State<MuseTextDiffViewer> {
 
   Widget _buildToolbar(BuildContext context) {
     final payload = widget.document.diff.payload;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 54),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          IconButton(
-            tooltip: '显示变化树',
-            isSelected: _showChanges,
-            onPressed: () => setState(() => _showChanges = !_showChanges),
-            icon: const Icon(Icons.account_tree_outlined, size: 19),
-          ),
-          Tooltip(
-            message: widget.document.file.path,
-            child: Text(
-              p.basename(widget.document.file.path),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ),
-          _MetricChip(
-            label: '${payload.changeCount} 处变更',
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          _MetricChip(label: '+${payload.additions}', color: Colors.green),
-          _MetricChip(label: '-${payload.deletions}', color: Colors.red),
-          SegmentedButton<MuseDiffLayout>(
-            segments: const [
-              ButtonSegment(
-                value: MuseDiffLayout.unified,
-                label: Text('统一'),
-                icon: Icon(Icons.view_stream_outlined, size: 16),
+    const iconStyle = ButtonStyle(
+      visualDensity: VisualDensity.compact,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: WidgetStatePropertyAll(EdgeInsets.all(6)),
+      minimumSize: WidgetStatePropertyAll(Size(30, 30)),
+    );
+    return SizedBox(
+      height: 36,
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: '显示变化树',
+                isSelected: _showChanges,
+                style: iconStyle,
+                onPressed: () => setState(() => _showChanges = !_showChanges),
+                icon: const Icon(Icons.account_tree_outlined, size: 16),
               ),
-              ButtonSegment(
-                value: MuseDiffLayout.split,
-                label: Text('并排'),
-                icon: Icon(Icons.vertical_split_outlined, size: 16),
+              _MetricChip(
+                label: '${payload.changeCount} 处变更',
+                color: Theme.of(context).colorScheme.primary,
               ),
-            ],
-            selected: {_layout},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) =>
-                setState(() => _layout = selection.single),
-          ),
-          IconButton(
-            tooltip: '上一处变更',
-            onPressed: _presentation.runs.isEmpty ? null : () => _jump(-1),
-            icon: const Icon(Icons.keyboard_arrow_up),
-          ),
-          IconButton(
-            tooltip: '下一处变更',
-            onPressed: _presentation.runs.isEmpty ? null : () => _jump(1),
-            icon: const Icon(Icons.keyboard_arrow_down),
-          ),
-          Text(
-            _presentation.runs.isEmpty
-                ? '0 / 0'
-                : '${_currentChange + 1} / ${_presentation.runs.length}',
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
-          _ToolbarToggle(
-            tooltip: '同步滚动',
-            selected: _syncScroll,
-            icon: Icons.sync_alt,
-            onPressed: () => setState(() => _syncScroll = !_syncScroll),
-          ),
-          _ToolbarToggle(
-            tooltip: '对齐变化',
-            selected: _alignChanges,
-            icon: Icons.align_vertical_center,
-            onPressed: () => setState(() => _alignChanges = !_alignChanges),
-          ),
-          _ToolbarToggle(
-            tooltip: '折叠未变化区域',
-            selected: _collapseUnchanged,
-            icon: Icons.unfold_less,
-            onPressed: _toggleCollapse,
-          ),
-          _ToolbarToggle(
-            tooltip: '软换行',
-            selected: _softWrap,
-            icon: Icons.wrap_text,
-            onPressed: () => setState(() => _softWrap = !_softWrap),
-          ),
-          _ToolbarToggle(
-            tooltip: '在两侧文档中查找',
-            selected: _showSearch,
-            icon: Icons.search,
-            onPressed: () => setState(() => _showSearch = !_showSearch),
-          ),
-          if (_showSearch) ...[
-            SizedBox(
-              width: 220,
-              height: 34,
-              child: TextField(
-                key: const ValueKey('diff-search-field'),
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  hintText: '查找…',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
+              const SizedBox(width: 6),
+              _MetricChip(label: '+${payload.additions}', color: Colors.green),
+              const SizedBox(width: 6),
+              _MetricChip(label: '-${payload.deletions}', color: Colors.red),
+              const SizedBox(width: 8),
+              SegmentedButton<MuseDiffLayout>(
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                segments: const [
+                  ButtonSegment(
+                    value: MuseDiffLayout.unified,
+                    label: Text('统一'),
+                    icon: Icon(Icons.view_stream_outlined, size: 14),
+                  ),
+                  ButtonSegment(
+                    value: MuseDiffLayout.split,
+                    label: Text('并排'),
+                    icon: Icon(Icons.vertical_split_outlined, size: 14),
+                  ),
+                ],
+                selected: {_layout},
+                showSelectedIcon: false,
+                onSelectionChanged: (selection) =>
+                    setState(() => _layout = selection.single),
+              ),
+              IconButton(
+                tooltip: '上一处变更',
+                style: iconStyle,
+                onPressed: _presentation.runs.isEmpty ? null : () => _jump(-1),
+                icon: const Icon(Icons.keyboard_arrow_up, size: 18),
+              ),
+              IconButton(
+                tooltip: '下一处变更',
+                style: iconStyle,
+                onPressed: _presentation.runs.isEmpty ? null : () => _jump(1),
+                icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+              ),
+              Text(
+                _presentation.runs.isEmpty
+                    ? '0 / 0'
+                    : '${_currentChange + 1} / ${_presentation.runs.length}',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              _ToolbarToggle(
+                tooltip: '同步滚动',
+                selected: _syncScroll,
+                icon: Icons.sync_alt,
+                onPressed: () => setState(() => _syncScroll = !_syncScroll),
+              ),
+              _ToolbarToggle(
+                tooltip: '对齐变化',
+                selected: _alignChanges,
+                icon: Icons.align_vertical_center,
+                onPressed: () => setState(() => _alignChanges = !_alignChanges),
+              ),
+              _ToolbarToggle(
+                tooltip: '折叠未变化区域',
+                selected: _collapseUnchanged,
+                icon: Icons.unfold_less,
+                onPressed: _toggleCollapse,
+              ),
+              _ToolbarToggle(
+                tooltip: '软换行',
+                selected: _softWrap,
+                icon: Icons.wrap_text,
+                onPressed: () => setState(() => _softWrap = !_softWrap),
+              ),
+              _ToolbarToggle(
+                tooltip: '在两侧文档中查找',
+                selected: _showSearch,
+                icon: Icons.search,
+                onPressed: () => setState(() => _showSearch = !_showSearch),
+              ),
+              if (_showSearch) ...[
+                SizedBox(
+                  width: 180,
+                  height: 28,
+                  child: TextField(
+                    key: const ValueKey('diff-search-field'),
+                    controller: _searchController,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: 12),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      hintText: '查找…',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                    ),
                   ),
                 ),
+                IconButton(
+                  tooltip: '上一处匹配',
+                  style: iconStyle,
+                  onPressed:
+                      _searchHits.isEmpty ? null : () => _jumpSearch(-1),
+                  icon: const Icon(Icons.keyboard_arrow_up, size: 18),
+                ),
+                IconButton(
+                  tooltip: '下一处匹配',
+                  style: iconStyle,
+                  onPressed: _searchHits.isEmpty ? null : () => _jumpSearch(1),
+                  icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+                ),
+                Text(
+                  _searchHits.isEmpty
+                      ? '0 / 0'
+                      : '${_searchIndex + 1} / ${_searchHits.length}',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ],
+              _ToolbarToggle(
+                tooltip: '审计信息',
+                selected: _showAudit,
+                icon: Icons.fact_check_outlined,
+                onPressed: () => setState(() => _showAudit = !_showAudit),
               ),
-            ),
-            IconButton(
-              tooltip: '上一处匹配',
-              onPressed: _searchHits.isEmpty ? null : () => _jumpSearch(-1),
-              icon: const Icon(Icons.keyboard_arrow_up),
-            ),
-            IconButton(
-              tooltip: '下一处匹配',
-              onPressed: _searchHits.isEmpty ? null : () => _jumpSearch(1),
-              icon: const Icon(Icons.keyboard_arrow_down),
-            ),
-            Text(
-              _searchHits.isEmpty
-                  ? '0 / 0'
-                  : '${_searchIndex + 1} / ${_searchHits.length}',
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-          ],
-          _ToolbarToggle(
-            tooltip: '审计信息',
-            selected: _showAudit,
-            icon: Icons.fact_check_outlined,
-            onPressed: () => setState(() => _showAudit = !_showAudit),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1437,8 +1452,14 @@ final class _ToolbarToggle extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(
         tooltip: tooltip,
         isSelected: selected,
-        selectedIcon: Icon(icon, size: 19),
-        icon: Icon(icon, size: 19),
+        style: const ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: WidgetStatePropertyAll(EdgeInsets.all(6)),
+          minimumSize: WidgetStatePropertyAll(Size(30, 30)),
+        ),
+        selectedIcon: Icon(icon, size: 16),
+        icon: Icon(icon, size: 16),
         onPressed: onPressed,
       );
 }
