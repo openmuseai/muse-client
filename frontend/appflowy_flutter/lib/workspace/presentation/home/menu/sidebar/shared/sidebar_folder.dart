@@ -19,11 +19,17 @@ class SidebarFolder extends StatelessWidget {
     this.isHoverEnabled = true,
     this.includeBottomSpacer = true,
     required this.userProfile,
+    this.expanded,
+    this.onExpandedChanged,
+    this.fillRemaining = false,
   });
 
   final bool isHoverEnabled;
   final bool includeBottomSpacer;
   final UserProfilePB userProfile;
+  final bool? expanded;
+  final ValueChanged<bool>? onExpandedChanged;
+  final bool fillRemaining;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +38,9 @@ class SidebarFolder extends StatelessWidget {
       valueListenable: getIt<MenuSharedState>().notifier,
       builder: (context, value, child) {
         return Column(
+          mainAxisSize:
+              fillRemaining ? MainAxisSize.max : MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const VSpace(4.0),
             // favorite
@@ -52,26 +61,48 @@ class SidebarFolder extends StatelessWidget {
                 final isCollaborativeWorkspace =
                     context.read<UserWorkspaceBloc>().state.isCollabWorkspaceOn;
 
+                final personal = PersonalSectionFolder(
+                  views: state.section.publicViews,
+                  expanded: expanded,
+                  onExpandedChanged: onExpandedChanged,
+                  fillRemaining: fillRemaining,
+                );
+                final public = PublicSectionFolder(
+                  views: state.section.publicViews,
+                  expanded: expanded,
+                  onExpandedChanged: onExpandedChanged,
+                  fillRemaining: fillRemaining,
+                );
+                final private = PrivateSectionFolder(
+                  views: state.section.privateViews,
+                  expanded: expanded,
+                  onExpandedChanged: onExpandedChanged,
+                );
+
                 // only show public and private section if the workspace is collaborative
                 return Column(
+                  mainAxisSize:
+                      fillRemaining ? MainAxisSize.max : MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: isCollaborativeWorkspace
                       ? [
                           // public
                           const VSpace(sectionPadding),
-                          PublicSectionFolder(views: state.section.publicViews),
-
+                          if (fillRemaining)
+                            Expanded(child: public)
+                          else
+                            public,
                           // private
                           const VSpace(sectionPadding),
-                          PrivateSectionFolder(
-                            views: state.section.privateViews,
-                          ),
+                          private,
                         ]
                       : [
                           // personal
                           const VSpace(sectionPadding),
-                          PersonalSectionFolder(
-                            views: state.section.publicViews,
-                          ),
+                          if (fillRemaining)
+                            Expanded(child: personal)
+                          else
+                            personal,
                         ],
                 );
               },
@@ -85,7 +116,13 @@ class SidebarFolder extends StatelessWidget {
 }
 
 class PrivateSectionFolder extends SectionFolder {
-  PrivateSectionFolder({super.key, required super.views})
+  PrivateSectionFolder({
+    super.key,
+    required super.views,
+    super.expanded,
+    super.onExpandedChanged,
+    super.fillRemaining,
+  })
       : super(
           title: LocaleKeys.sideBar_private.tr(),
           spaceType: FolderSpaceType.private,
@@ -95,7 +132,13 @@ class PrivateSectionFolder extends SectionFolder {
 }
 
 class PublicSectionFolder extends SectionFolder {
-  PublicSectionFolder({super.key, required super.views})
+  PublicSectionFolder({
+    super.key,
+    required super.views,
+    super.expanded,
+    super.onExpandedChanged,
+    super.fillRemaining,
+  })
       : super(
           title: LocaleKeys.sideBar_workspace.tr(),
           spaceType: FolderSpaceType.public,
@@ -105,7 +148,13 @@ class PublicSectionFolder extends SectionFolder {
 }
 
 class PersonalSectionFolder extends SectionFolder {
-  PersonalSectionFolder({super.key, required super.views})
+  PersonalSectionFolder({
+    super.key,
+    required super.views,
+    super.expanded,
+    super.onExpandedChanged,
+    super.fillRemaining,
+  })
       : super(
           title: LocaleKeys.sideBar_personal.tr(),
           spaceType: FolderSpaceType.public,

@@ -20,6 +20,9 @@ class SectionFolder extends StatefulWidget {
     this.isHoverEnabled = true,
     required this.expandButtonTooltip,
     required this.addButtonTooltip,
+    this.expanded,
+    this.onExpandedChanged,
+    this.fillRemaining = false,
   });
 
   final String title;
@@ -28,6 +31,9 @@ class SectionFolder extends StatefulWidget {
   final bool isHoverEnabled;
   final String expandButtonTooltip;
   final String addButtonTooltip;
+  final bool? expanded;
+  final ValueChanged<bool>? onExpandedChanged;
+  final bool fillRemaining;
 
   @override
   State<SectionFolder> createState() => _SectionFolderState();
@@ -51,29 +57,57 @@ class _SectionFolderState extends State<SectionFolder> {
         create: (_) => FolderBloc(type: widget.spaceType)
           ..add(const FolderEvent.initial()),
         child: BlocBuilder<FolderBloc, FolderState>(
-          builder: (context, state) => Column(
-            children: [
-              _buildHeader(context),
-              // Pages
-              const VSpace(4.0),
-              ..._buildViews(context, state, isHovered),
-              // Add a placeholder if there are no views
-              _buildDraggablePlaceholder(context),
-            ],
-          ),
+          builder: (context, state) {
+            final expanded = widget.expanded ?? state.isExpanded;
+            final views = _buildViews(context, expanded, isHovered);
+            return Column(
+              mainAxisSize:
+                  widget.fillRemaining ? MainAxisSize.max : MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(context, expanded),
+                if (expanded) const VSpace(4.0),
+                if (expanded)
+                  widget.fillRemaining
+                      ? Expanded(
+                          child: ListView(
+                            padding: EdgeInsets.zero,
+                            children: [
+                              ...views,
+                              _buildDraggablePlaceholder(context),
+                            ],
+                          ),
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ...views,
+                            _buildDraggablePlaceholder(context),
+                          ],
+                        ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, bool expanded) {
     return FolderHeader(
       title: widget.title,
-      isExpanded: context.watch<FolderBloc>().state.isExpanded,
+      isExpanded: expanded,
       expandButtonTooltip: widget.expandButtonTooltip,
       addButtonTooltip: widget.addButtonTooltip,
-      onPressed: () =>
-          context.read<FolderBloc>().add(const FolderEvent.expandOrUnExpand()),
+      onPressed: () {
+        final next = !expanded;
+        final onChanged = widget.onExpandedChanged;
+        if (onChanged != null) {
+          onChanged(next);
+        } else {
+          context.read<FolderBloc>().add(const FolderEvent.expandOrUnExpand());
+        }
+      },
       onAdded: () {
         context.read<SidebarSectionsBloc>().add(
               SidebarSectionsEvent.createRootViewInSection(
@@ -83,19 +117,24 @@ class _SectionFolderState extends State<SectionFolder> {
               ),
             );
 
-        context
-            .read<FolderBloc>()
-            .add(const FolderEvent.expandOrUnExpand(isExpanded: true));
+        final onChanged = widget.onExpandedChanged;
+        if (onChanged != null) {
+          onChanged(true);
+        } else {
+          context
+              .read<FolderBloc>()
+              .add(const FolderEvent.expandOrUnExpand(isExpanded: true));
+        }
       },
     );
   }
 
   Iterable<Widget> _buildViews(
     BuildContext context,
-    FolderState state,
+    bool expanded,
     ValueNotifier<bool> isHovered,
   ) {
-    if (!state.isExpanded) {
+    if (!expanded) {
       return [];
     }
 

@@ -23,10 +23,16 @@ final class MuseWorkspaceExplorer extends StatefulWidget {
     super.key,
     required this.accountSpaceRef,
     required this.accountSpaceTitle,
+    this.expanded,
+    this.onExpandedChanged,
+    this.fillRemaining = false,
   });
 
   final String accountSpaceRef;
   final String accountSpaceTitle;
+  final bool? expanded;
+  final ValueChanged<bool>? onExpandedChanged;
+  final bool fillRemaining;
 
   @override
   State<MuseWorkspaceExplorer> createState() => _MuseWorkspaceExplorerState();
@@ -57,31 +63,51 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
         title: widget.accountSpaceTitle,
       );
 
+  bool get _expanded => widget.expanded ?? _sectionExpanded;
+
+  void _toggleExpanded() {
+    final next = !_expanded;
+    final onChanged = widget.onExpandedChanged;
+    if (onChanged != null) {
+      onChanged(next);
+    } else {
+      setState(() => _sectionExpanded = next);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
           final hasMounts = _controller.mounts.isNotEmpty;
+          final body = _controller.loading
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              : hasMounts
+                  ? _buildTree(context)
+                  : _buildEmpty(context);
           return Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:
+                widget.fillRemaining ? MainAxisSize.max : MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(context),
-              if (_sectionExpanded) const VSpace(4),
-              if (_sectionExpanded)
-                _controller.loading
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(
-                          child: SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+              if (_expanded) const VSpace(4),
+              if (_expanded)
+                widget.fillRemaining
+                    ? Expanded(
+                        child: FlowyScrollbar(
+                          child: SingleChildScrollView(child: body),
                         ),
                       )
-                    : hasMounts
-                        ? _buildTree(context)
-                        : _buildEmpty(context),
+                    : body,
             ],
           );
         },
@@ -94,13 +120,13 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
         padding: const EdgeInsets.only(left: 6, right: 4),
         child: FlowyButton(
           margin: const EdgeInsets.only(left: 6, right: 4),
-          onTap: () => setState(() => _sectionExpanded = !_sectionExpanded),
+          onTap: _toggleExpanded,
           text: Row(
             children: [
               const FlowyText('Project Workspace'),
               const HSpace(4),
               FlowySvg(
-                _sectionExpanded
+                _expanded
                     ? FlowySvgs.workspace_drop_down_menu_show_s
                     : FlowySvgs.workspace_drop_down_menu_hide_s,
               ),

@@ -310,6 +310,9 @@ class _SidebarState extends State<_Sidebar> {
   final _scrollOffset = ValueNotifier<double>(0);
 
   // mute the update button during the current application lifecycle.
+  bool _projectExpanded = true;
+  bool _personalExpanded = true;
+  bool _preferPersonal = false;
   final _muteUpdateButton = ValueNotifier(false);
 
   @override
@@ -422,44 +425,100 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
+  static const _headerReserve = 96.0;
+  static const _minSharedBody = 320.0;
+
+  bool _roomForBoth(double height) =>
+      height >= _headerReserve + _minSharedBody;
+
+  void _setProjectExpanded(bool expanded, double height) {
+    setState(() {
+      _preferPersonal = false;
+      _projectExpanded = expanded;
+      if (expanded && !_roomForBoth(height)) {
+        _personalExpanded = false;
+      }
+    });
+  }
+
+  void _setPersonalExpanded(bool expanded, double height) {
+    setState(() {
+      _preferPersonal = true;
+      _personalExpanded = expanded;
+      if (expanded && !_roomForBoth(height)) {
+        _projectExpanded = false;
+      }
+    });
+  }
+
+  void _reconcileHeight(double height) {
+    if (!_projectExpanded || !_personalExpanded || _roomForBoth(height)) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_projectExpanded || !_personalExpanded || _roomForBoth(height)) {
+        return;
+      }
+      setState(() {
+        if (_preferPersonal) {
+          _projectExpanded = false;
+        } else {
+          _personalExpanded = false;
+        }
+      });
+    });
+  }
+
   Widget _renderWorkspaceAndKnowledge(EdgeInsets menuHorizontalInset) {
     final workspace = context.read<UserWorkspaceBloc>().state.currentWorkspace;
     return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Padding(
-              padding: menuHorizontalInset,
-              child: FlowyScrollbar(
-                child: SingleChildScrollView(
-                  child: MuseWorkspaceExplorer(
-                    accountSpaceRef: workspace?.workspaceId ?? 'default',
-                    accountSpaceTitle: workspace?.name ?? 'Workspace',
-                  ),
-                ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          _reconcileHeight(constraints.maxHeight);
+          final project = Padding(
+            padding: menuHorizontalInset,
+            child: MuseWorkspaceExplorer(
+              accountSpaceRef: workspace?.workspaceId ?? 'default',
+              accountSpaceTitle: workspace?.name ?? 'Workspace',
+              expanded: _projectExpanded,
+              fillRemaining: _projectExpanded,
+              onExpandedChanged: (expanded) =>
+                  _setProjectExpanded(expanded, constraints.maxHeight),
+            ),
+          );
+          final personal = _renderFolderOrSpaceBody(
+            menuHorizontalInset,
+            expanded: _personalExpanded,
+            fillRemaining: _personalExpanded,
+            onExpandedChanged: (expanded) =>
+                _setPersonalExpanded(expanded, constraints.maxHeight),
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_projectExpanded) Expanded(child: project) else project,
+              const VSpace(12),
+              Padding(
+                padding: menuHorizontalInset +
+                    const EdgeInsets.symmetric(horizontal: 4),
+                child: const FlowyDivider(),
               ),
-            ),
-          ),
-          const VSpace(12),
-          Padding(
-            padding:
-                menuHorizontalInset + const EdgeInsets.symmetric(horizontal: 4),
-            child: const FlowyDivider(),
-          ),
-          const VSpace(8),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * 0.32,
-            ),
-            child: _renderFolderOrSpaceBody(menuHorizontalInset),
-          ),
-        ],
+              const VSpace(8),
+              if (_personalExpanded) Expanded(child: personal) else personal,
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _renderFolderOrSpaceBody(EdgeInsets menuHorizontalInset) {
+  Widget _renderFolderOrSpaceBody(
+    EdgeInsets menuHorizontalInset, {
+    required bool expanded,
+    required bool fillRemaining,
+    required ValueChanged<bool> onExpandedChanged,
+  }) {
     final spaceState = context.read<SpaceBloc>().state;
     final workspaceState = context.read<UserWorkspaceBloc>().state;
 
@@ -477,44 +536,50 @@ class _SidebarState extends State<_Sidebar> {
       context.read<SpaceBloc>().add(const SpaceEvent.didReceiveSpaceUpdate());
     }
 
-    return !containsSpace ||
-            spaceState.spaces.isEmpty ||
-            !workspaceState.isCollabWorkspaceOn
-        ? Padding(
-            padding: menuHorizontalInset - const EdgeInsets.only(right: 6),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.only(right: 6),
-              controller: _scrollController,
-              physics: const ClampingScrollPhysics(),
-              children: [
-                SidebarFolder(
-                  userProfile: widget.userProfile,
-                  isHoverEnabled: !_isScrolling,
-                  includeBottomSpacer: false,
-                ),
-              ],
+    final padding = menuHorizontalInset - const EdgeInsets.only(right: 6);
+    if (!containsSpace ||
+        spaceState.spaces.isEmpty ||
+        !workspaceState.isCollabWorkspaceOn) {
+      return Padding(
+        padding: padding,
+        child: SidebarFolder(
+          userProfile: widget.userProfile,
+          isHoverEnabled: !_isScrolling,
+          includeBottomSpacer: false,
+          expanded: expanded,
+          fillRemaining: fillRemaining,
+          onExpandedChanged: onExpandedChanged,
+        ),
+      );
+    }
+
+    final space = Padding(
+      padding: padding,
+      child: FlowyScrollbar(
+        controller: _scrollController,
+        child: ListView(
+          shrinkWrap: !fillRemaining,
+          padding: const EdgeInsets.only(right: 6),
+          controller: _scrollController,
+          physics: const ClampingScrollPhysics(),
+          children: [
+            SidebarSpace(
+              userProfile: widget.userProfile,
+              isHoverEnabled: !_isScrolling,
+              includeBottomSpacer: false,
             ),
-          )
-        : Padding(
-            padding: menuHorizontalInset - const EdgeInsets.only(right: 6),
-            child: FlowyScrollbar(
-              controller: _scrollController,
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.only(right: 6),
-                controller: _scrollController,
-                physics: const ClampingScrollPhysics(),
-                children: [
-                  SidebarSpace(
-                    userProfile: widget.userProfile,
-                    isHoverEnabled: !_isScrolling,
-                    includeBottomSpacer: false,
-                  ),
-                ],
-              ),
-            ),
-          );
+          ],
+        ),
+      ),
+    );
+    if (expanded) return space;
+    return GestureDetector(
+      onTap: () => onExpandedChanged(true),
+      child: SizedBox(
+        height: HomeSizes.workspaceSectionHeight,
+        child: ClipRect(child: IgnorePointer(child: space)),
+      ),
+    );
   }
 
   Widget _renderUpgradeSpaceButton(EdgeInsets menuHorizontalInset) {
