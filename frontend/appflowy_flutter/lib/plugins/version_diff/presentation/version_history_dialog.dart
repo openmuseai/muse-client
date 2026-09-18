@@ -226,7 +226,12 @@ final class _VersionHistoryDialogState extends State<_VersionHistoryDialog> {
     );
     if (!mounted) return;
     navigator.pop();
-    tabs.openExternalPlugin(MuseTextDiffPlugin(document));
+    tabs.openExternalPlugin(
+      MuseTextDiffPlugin.compare(
+        document: document,
+        fileName: p.basename(widget.file.path),
+      ),
+    );
   }
 }
 

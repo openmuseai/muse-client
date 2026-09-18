@@ -8,7 +8,6 @@ import 'package:appflowy/plugins/resource_surface/surfaces/helix_resource_surfac
 import 'package:appflowy/plugins/resource_surface/surfaces/ioffice_word_resource_surface.dart';
 import 'package:appflowy/plugins/resource_surface/surfaces/open_file_viewer_resource_surface.dart';
 import 'package:appflowy/plugins/version_diff/presentation/resource_version_pane.dart';
-import 'package:appflowy/plugins/version_diff/presentation/text_diff_viewer.dart';
 import 'package:appflowy/startup/plugin/plugin.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/workspace/presentation/home/home_stack.dart';
@@ -102,20 +101,20 @@ final class MuseResourcePluginWidgetBuilder extends PluginWidgetBuilder
   EdgeInsets get contentPadding => EdgeInsets.zero;
 
   @override
+  bool get showNavigationTitle => false;
+
+  @override
   String get viewName => _name;
 
   @override
-  Widget get leftBarItem => _ResourceTitle(
-        file: plugin.resource.file,
-        showPath: false,
-      );
+  Widget get leftBarItem => const SizedBox.shrink();
 
   @override
   Widget tabBarItem(String pluginId, [bool shortForm = false]) =>
       _ResourceTitle(file: plugin.resource.file, showPath: false);
 
   @override
-  List<NavigationItem> get navigationItems => [this];
+  List<NavigationItem> get navigationItems => const [];
 
   @override
   Widget buildWidget({
@@ -123,49 +122,25 @@ final class MuseResourcePluginWidgetBuilder extends PluginWidgetBuilder
     required bool shrinkWrap,
     Map<String, dynamic>? data,
   }) {
-    final pane =
-        getIt<MuseResourceVersionPaneRegistry>().of(plugin.resource.file);
     return ValueListenableBuilder<MuseLocalEngine>(
       valueListenable: plugin.engineListenable,
       builder: (context, engine, _) {
-        return AnimatedBuilder(
-          animation: pane,
-          builder: (context, _) {
-            final surface = ClipRect(
-              child: switch (engine) {
-                MuseLocalEngine.ioffice => IofficeWordResourceSurface(
-                    key: ValueKey('ioffice:${plugin.resource.file.path}'),
-                    file: plugin.resource.file,
-                  ),
-                MuseLocalEngine.helix => HelixResourceSurface(
-                    key: ValueKey('helix:${plugin.resource.file.path}'),
-                    file: plugin.resource.file,
-                    initialLine: plugin.resource.line,
-                  ),
-                MuseLocalEngine.openFileViewer => OpenFileViewerResourceSurface(
-                    key: ValueKey('viewer:${plugin.resource.file.path}'),
-                    file: plugin.resource.file,
-                    initialLine: plugin.resource.line,
-                  ),
-              },
-            );
-            return pane.document == null
-                ? surface
-                : Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Offstage(
-                        child: surface,
-                      ),
-                      MuseTextDiffViewer(
-                        key: ValueKey(
-                          '${pane.document!.diff.comparison.id}:${pane.layout.name}',
-                        ),
-                        document: pane.document!,
-                        initialLayout: pane.layout,
-                      ),
-                    ],
-                  );
+        return ClipRect(
+          child: switch (engine) {
+            MuseLocalEngine.ioffice => IofficeWordResourceSurface(
+                key: ValueKey('ioffice:${plugin.resource.file.path}'),
+                file: plugin.resource.file,
+              ),
+            MuseLocalEngine.helix => HelixResourceSurface(
+                key: ValueKey('helix:${plugin.resource.file.path}'),
+                file: plugin.resource.file,
+                initialLine: plugin.resource.line,
+              ),
+            MuseLocalEngine.openFileViewer => OpenFileViewerResourceSurface(
+                key: ValueKey('viewer:${plugin.resource.file.path}'),
+                file: plugin.resource.file,
+                initialLine: plugin.resource.line,
+              ),
           },
         );
       },
@@ -182,18 +157,22 @@ class _ResourceTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final extension = p.extension(file.path).toLowerCase();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(_iconFor(extension), size: 16),
-        const SizedBox(width: 7),
-        Flexible(
-          child: FlowyText.medium(
-            showPath ? file.path : p.basename(file.path),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
+    final label = FlowyText.medium(
+      showPath ? file.path : p.basename(file.path),
+      overflow: TextOverflow.ellipsis,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_iconFor(extension), size: 16),
+          const SizedBox(width: 7),
+          if (constraints.hasBoundedWidth)
+            Flexible(child: label)
+          else
+            label,
+        ],
+      ),
     );
   }
 
