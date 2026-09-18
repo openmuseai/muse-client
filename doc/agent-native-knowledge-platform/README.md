@@ -71,8 +71,10 @@ Muse 不是另一个 Office，也不是在 Office 旁边增加一个聊天框。
 | [09-implementation-roadmap.md](09-implementation-roadmap.md) | 研发管理、QA | 如何从当前代码分阶段交付，验收与退出条件是什么 |
 | [10-end-to-end-scenarios.md](10-end-to-end-scenarios.md) | 全体 | 产品需求变更、未知格式与跨端场景如何端到端运行 |
 | [11-decisions-and-open-questions.md](11-decisions-and-open-questions.md) | 决策者 | 哪些问题已经决定，哪些必须在 spike 后冻结 |
+| [12-web-host-merge-analysis.md](12-web-host-merge-analysis.md) | 决策者、研发负责人 | 接近功能对等时，能否把 `frontend/web` 并进 Flutter Client |
+| [13-web-host-forced-consolidation-reduced-scope-analysis.md](13-web-host-forced-consolidation-reduced-scope-analysis.md) | 决策者、研发负责人 | 强制收口且允许 Web 精简时的可行方案、工作量、风险和性能门 |
 
-推荐阅读顺序：产品负责人读 01 → 05 → 07 → 10；技术负责人读 02 → 03 → 04 → 06 → 08 → 09。
+推荐阅读顺序：产品负责人读 01 → 05 → 07 → 10；技术负责人读 02 → 03 → 04 → 06 → 08 → 09。评估双前端收口时，功能对等场景读 12，Web 可精简场景读 13。
 
 格式引擎的阶段级设计、开发计划和测试矩阵见：
 
