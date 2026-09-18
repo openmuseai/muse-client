@@ -818,28 +818,25 @@ class _HomeTopBarState extends State<HomeTopBar>
     super.build(context);
     final notifier = Provider.of<PageNotifier>(context, listen: false);
     final showTitle = notifier.plugin.widgetBuilder.showNavigationTitle;
-    final height = showTitle
-        ? HomeSizes.topBarHeight + HomeInsets.topBarTitleVerticalPadding
-        : 32.0;
+    if (!showTitle) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
       ),
-      height: height,
+      height: HomeSizes.topBarHeight + HomeInsets.topBarTitleVerticalPadding,
       child: Padding(
-        padding: EdgeInsets.symmetric(
+        padding: const EdgeInsets.symmetric(
           horizontal: HomeInsets.topBarTitleHorizontalPadding,
-          vertical: showTitle ? HomeInsets.topBarTitleVerticalPadding : 4,
+          vertical: HomeInsets.topBarTitleVerticalPadding,
         ),
         child: Row(
           children: [
             HSpace(widget.layout.menuSpacing),
-            if (showTitle)
-              const Expanded(child: FlowyNavigation())
-            else
-              const FlowyNavigation(),
-            if (showTitle) const HSpace(16),
+            const Expanded(child: FlowyNavigation()),
+            const HSpace(16),
             ChangeNotifierProvider.value(
               value: notifier,
               child: Consumer(
@@ -848,8 +845,6 @@ class _HomeTopBarState extends State<HomeTopBar>
                     const SizedBox.shrink(),
               ),
             ),
-            const Spacer(),
-            const HSpace(8),
           ],
         ),
       ),
