@@ -24,9 +24,8 @@ rm -rf "$VIEWER_OUT/cmaps" "$VIEWER_OUT/standard_fonts"
 cp -R "$PDFJS/cmaps" "$VIEWER_OUT/cmaps"
 cp -R "$PDFJS/standard_fonts" "$VIEWER_OUT/standard_fonts"
 
-# The embedded read-only surface needs the editor binary, not all 300+
-# tree-sitter grammars. Keep application builds independent from grammar hosts;
-# selected prebuilt grammars can be added to runtime/ in a later capability wave.
+# Build the Helix binary without compiling the full 300+ grammar catalog.
+# A small Host language set is fetched/built into runtime/grammars below.
 HELIX_DISABLE_AUTO_GRAMMAR_BUILD=1 cargo +1.90.0 build \
   --manifest-path "$HELIX_VENDOR/Cargo.toml" \
   --release \
@@ -39,6 +38,27 @@ mkdir -p "$HELIX_OUT/runtime"
 cp "$HELIX_VENDOR/languages.toml" "$HELIX_OUT/runtime/languages.toml"
 cp -R "$HELIX_VENDOR/runtime/themes" "$HELIX_OUT/runtime/themes"
 cp -R "$HELIX_VENDOR/runtime/queries" "$HELIX_OUT/runtime/queries"
+mkdir -p "$HELIX_OUT/runtime/grammars"
+
+# Highlighting needs compiled tree-sitter libraries, not Language Servers.
+# Fetch/build only the Host language set; skip the full 300+ grammar catalog.
+GRAMMAR_XDG=$(mktemp -d "${TMPDIR:-/tmp}/helix-grammars.XXXXXX")
+mkdir -p "$GRAMMAR_XDG/helix"
+cat > "$GRAMMAR_XDG/helix/languages.toml" <<'EOF'
+use-grammars = { only = ["dart", "rust", "json", "toml", "markdown", "markdown_inline", "comment"] }
+EOF
+unset CARGO_MANIFEST_DIR || true
+if HELIX_RUNTIME="$HELIX_VENDOR/runtime" XDG_CONFIG_HOME="$GRAMMAR_XDG" \
+  "$HELIX_OUT/hx" --grammar fetch &&
+   HELIX_RUNTIME="$HELIX_VENDOR/runtime" XDG_CONFIG_HOME="$GRAMMAR_XDG" \
+  "$HELIX_OUT/hx" --grammar build; then
+  find "$GRAMMAR_XDG/helix/runtime/grammars" -maxdepth 1 \( -name '*.dylib' -o -name '*.so' -o -name '*.dll' \) \
+    -exec cp {} "$HELIX_OUT/runtime/grammars/" \;
+else
+  echo "warning: Helix grammar fetch/build failed; syntax highlighting will require in-app install" >&2
+fi
+rm -rf "$GRAMMAR_XDG"
+
 # Flutter asset directories are intentionally shallow. Keep the complete
 # language query tree in one direct asset and unpack it into a private runtime
 # directory on first open.
