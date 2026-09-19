@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:appflowy/plugins/resource_surface/helix/helix_commands.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_install.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_settings.dart';
+import 'package:appflowy/plugins/resource_surface/helix/helix_warm_pool.dart';
 import 'package:appflowy/plugins/resource_surface/resource_surface_session.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:flutter/gestures.dart';
@@ -35,6 +36,16 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
   StreamSubscription<Uint8List>? _output;
   Directory? _configRoot;
   bool _booted = false;
+  /// Helix paints its first frame only after the process has started, so the
+  /// pane stays covered by the loading indicator until the PTY reports output.
+  bool _painted = false;
+  /// When true, the next PTY output lifts the loading cover. It is armed at
+  /// spawn for cold starts and after `:open` for adopted warm processes, so a
+  /// warm process's dashboard is replayed without ever being shown.
+  bool _revealRequested = false;
+  Timer? _paintTimeout;
+  /// Watches an adopted warm process until it really shows the document.
+  Timer? _openWatch;
   String? _error;
   HelixSettings _applied = HelixSettings.defaults;
   int _lspRevision = -1;
@@ -142,6 +153,27 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
       environment['PATH'] = installer.pathPrefix(
         environment['PATH'] ?? '/usr/bin:/bin',
       );
+      // Prefer a process the pool already started: `:open` on a live Helix
+      // costs a fraction of Helix's per-file process start. Everything below is
+      // the unchanged cold path, used whenever the pool has nothing to offer.
+      HelixWarmSpec? warmSpec;
+      try {
+        warmSpec = await buildHelixWarmSpec(
+          installer: installer,
+          install: install,
+          settings: _applied,
+          workingDirectory: project.path,
+        );
+      } on Object {
+        warmSpec = null;
+      }
+      if (warmSpec != null) {
+        final warm = await HelixWarmPool.instance.take(warmSpec);
+        if (warm != null) {
+          _adoptWarmProcess(warm, warmSpec);
+          return;
+        }
+      }
       final pty = Pty.start(
         install.binary,
         arguments: arguments,
@@ -151,22 +183,122 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
         columns: 100,
       );
       _pty = pty;
-      _output = pty.output.listen(
-        (data) => _terminal.write(utf8.decode(data, allowMalformed: true)),
-        onError: (Object error) {
-          if (mounted) setState(() => _error = 'Helix PTY error: $error');
-        },
-      );
+      _output = pty.output.listen(_onPtyData, onError: _onPtyError);
       if (mounted) {
         setState(() {});
         _booted = true;
+        _revealRequested = true;
+        _armPaintTimeout();
         _lspRevision = _settingsController.installer.revision;
         WidgetsBinding.instance.addPostFrameCallback((_) => _syncPtySize());
         unawaited(_enterInsertMode(pty));
       }
+      if (warmSpec != null) HelixWarmPool.instance.schedule(warmSpec);
     } on Object catch (error) {
       if (mounted) setState(() => _error = 'Helix runtime unavailable: $error');
     }
+  }
+
+  void _onPtyData(Uint8List data) {
+    if (_revealRequested && !_painted) {
+      _paintTimeout?.cancel();
+      _paintTimeout = null;
+      if (mounted) {
+        setState(() => _painted = true);
+      } else {
+        _painted = true;
+      }
+    }
+    _terminal.write(utf8.decode(data, allowMalformed: true));
+  }
+
+  void _onPtyError(Object error) {
+    if (mounted) setState(() => _error = 'Helix PTY error: $error');
+  }
+
+  /// Safety net: never leave the loading cover up if Helix stays silent.
+  void _armPaintTimeout() {
+    _paintTimeout?.cancel();
+    _paintTimeout = Timer(const Duration(seconds: 8), () {
+      _openWatch?.cancel();
+      _openWatch = null;
+      if (mounted && !_painted) setState(() => _painted = true);
+    });
+  }
+
+  /// Turns a pre-started, file-less Helix process into this tab's editor: the
+  /// output it produced while idle is replayed into the local terminal model
+  /// (hidden behind the loading cover) and then `:open` shows the document.
+  void _adoptWarmProcess(HelixWarmProcess warm, HelixWarmSpec spec) {
+    final pty = warm.pty;
+    final buffered = warm.takeBufferedOutput();
+    if (buffered.isNotEmpty) {
+      _terminal.write(utf8.decode(buffered, allowMalformed: true));
+    }
+    if (!mounted) {
+      pty.kill();
+      HelixWarmPool.instance.schedule(spec);
+      return;
+    }
+    _pty = pty;
+    _output = warm.output.listen(_onPtyData, onError: _onPtyError);
+    setState(() {});
+    _booted = true;
+    // The cover is lifted by _watchWarmOpen once the document is really on
+    // screen; PTY output alone would also match the echoed command line.
+    _revealRequested = false;
+    _armPaintTimeout();
+    _lspRevision = _settingsController.installer.revision;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncPtySize());
+    pty.write(
+      helixOpenCommandBytes(widget.file.path, line: widget.initialLine),
+    );
+    // Refill the pool so the next document opens just as fast.
+    HelixWarmPool.instance.schedule(spec);
+    unawaited(_enterInsertMode(pty));
+    _watchWarmOpen(pty);
+  }
+
+  /// Waits until Helix's status line names [widget.file], then lifts the loading
+  /// cover. If the adopted process never switches buffers, the tab falls back to
+  /// a cold start so the pool's scratch buffer can never be shown to the user.
+  void _watchWarmOpen(Pty pty) {
+    const step = Duration(milliseconds: 60);
+    const deadline = Duration(milliseconds: 1000);
+    var elapsed = Duration.zero;
+    _openWatch?.cancel();
+    _openWatch = Timer.periodic(step, (timer) {
+      elapsed += step;
+      if (!mounted || _pty != pty) {
+        timer.cancel();
+        _openWatch = null;
+        return;
+      }
+      if (_terminalShowsOpenFile()) {
+        timer.cancel();
+        _openWatch = null;
+        setState(() => _painted = true);
+        return;
+      }
+      if (elapsed >= deadline) {
+        timer.cancel();
+        _openWatch = null;
+        unawaited(_reboot());
+      }
+    });
+  }
+
+  /// True once the name of [widget.file] appears in one of the bottom rows of
+  /// the terminal, where Helix prints the current document's status line.
+  bool _terminalShowsOpenFile() {
+    final name = p.basename(widget.file.path);
+    if (name.isEmpty) return true;
+    final lines = _terminal.buffer.lines;
+    final from = lines.length - 3 < 0 ? 0 : lines.length - 3;
+    for (var index = from; index < lines.length; index++) {
+      if (lines[index].getText().contains(name)) return true;
+    }
+    return false;
   }
 
   void _onSettingsChanged() {
@@ -182,16 +314,23 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
     _applied = next;
     if ((appearanceChanged || reboot) && mounted) setState(() {});
     if (reboot && _booted) {
+      // Idle processes were started with the previous settings; drop them so
+      // the rebooted surface cannot adopt a stale configuration.
+      HelixWarmPool.instance.invalidate();
       unawaited(_reboot());
     }
   }
 
   Future<void> _reboot() async {
     await _flushToOriginal();
+    _openWatch?.cancel();
+    _openWatch = null;
     _pty?.kill();
     await _output?.cancel();
     _pty = null;
     _booted = false;
+    _painted = false;
+    _revealRequested = false;
     if (mounted) await _boot();
   }
 
@@ -321,6 +460,8 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
   @override
   void dispose() {
     _settingsController.removeListener(_onSettingsChanged);
+    _paintTimeout?.cancel();
+    _openWatch?.cancel();
     MuseResourceSurfaceSession.instance.detach(widget.file);
     unawaited(_output?.cancel());
     final pty = _pty;
@@ -345,16 +486,34 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
   @override
   Widget build(BuildContext context) {
     if (_error != null) return Center(child: Text(_error!));
-    if (!_booted && _bootMessage != null) {
+    if (!_booted) {
+      // Helix is spawned per file and needs a moment before it paints its first
+      // frame; show progress instead of an empty editor pane in the meantime.
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(_bootMessage!),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                _bootMessage ?? '正在启动 Helix 编辑器…',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
     final settings = _applied;
-    return Column(
+    return Stack(
+      children: [
+        Column(
       children: [
         GestureDetector(
           onSecondaryTapDown: (details) =>
@@ -435,6 +594,31 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
             ),
           ),
         ),
+      ],
+        ),
+        // The PTY exists before Helix has drawn anything, so cover the still
+        // empty terminal until the first bytes arrive instead of showing a
+        // blank editor pane.
+        if (!_painted)
+          Positioned.fill(
+            child: ColoredBox(
+              color: settings.backgroundColor,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.4),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('正在启动 Helix 编辑器…', textAlign: TextAlign.center),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
