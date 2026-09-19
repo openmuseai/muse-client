@@ -240,7 +240,9 @@ final class HelixLanguageServerInstaller extends ChangeNotifier {
   String pathPrefix(String currentPath) {
     final extra = pathEntries.where((dir) => Directory(dir).existsSync());
     if (extra.isEmpty) return currentPath;
-    return '${extra.join(':')}:$currentPath';
+    // Windows separates PATH entries with ';', everything else with ':'.
+    final separator = Platform.isWindows ? ';' : ':';
+    return '${extra.join(separator)}$separator$currentPath';
   }
 
   Directory get xdgConfigHome {
@@ -811,17 +813,37 @@ Future<File?> _findNamedBinary(Directory root, String name) async {
 
 Future<void> _markExecutable(File file) async {
   if (!file.existsSync()) return;
+  if (Platform.isWindows) return; // Windows has no executable bit.
   await Process.run('chmod', ['+x', file.path]);
   if (Platform.isMacOS) {
     await Process.run('xattr', ['-dr', 'com.apple.quarantine', file.path]);
   }
 }
 
+/// Resolves a command against `PATH` without shelling out: Windows ships
+/// neither `which` nor a POSIX-like lookup, and spawning a missing helper
+/// throws instead of returning null.
 Future<String?> _which(String command) async {
-  final result = await Process.run('which', [command]);
-  if (result.exitCode != 0) return null;
-  final path = result.stdout.toString().trim();
-  return path.isEmpty ? null : path;
+  if (command.trim().isEmpty) return null;
+  final separator = Platform.isWindows ? ';' : ':';
+  final entries = (Platform.environment['PATH'] ?? '').split(separator);
+  final suffixes = <String>[''];
+  if (Platform.isWindows && p.extension(command).isEmpty) {
+    final pathExt = Platform.environment['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD';
+    for (final ext in pathExt.split(';')) {
+      final trimmed = ext.trim().toLowerCase();
+      if (trimmed.isNotEmpty) suffixes.add(trimmed);
+    }
+  }
+  for (final entry in entries) {
+    final dir = entry.trim().replaceAll('"', '');
+    if (dir.isEmpty) continue;
+    for (final suffix in suffixes) {
+      final candidate = File(p.join(dir, '$command$suffix'));
+      if (candidate.existsSync()) return candidate.path;
+    }
+  }
+  return null;
 }
 
 String helixLspHostTriple() {
