@@ -372,6 +372,7 @@ flutter:
     - assets/engines/helix/runtime/
     - assets/engines/helix/runtime/themes/
     - assets/engines/helix/runtime/queries/
+    - assets/engines/helix/runtime/grammars/
 
     # The following assets will be excluded in release.
     # BEGIN: EXCLUDE_IN_RELEASE

@@ -45,6 +45,52 @@ def overlay_flutter_product(product_dir: Path, portable: Path) -> None:
             shutil.copy2(item, dest)
 
 
+HELIX_RUNTIME_RELATIVE = (
+    Path("data")
+    / "flutter_assets"
+    / "assets"
+    / "engines"
+    / "helix"
+    / "runtime"
+)
+
+
+def sync_helix_runtime_assets(flutter_app: Path, product_dir: Path) -> None:
+    """Complete the bundled Helix runtime inside the built product.
+
+    `flutter build` copies only the files that sit directly in a declared asset
+    directory, so the per-language `runtime/queries/<language>/` trees of the
+    Helix engine never reach the release bundle. HelixInstall.resolve() checks
+    for `runtime/queries` and, when it is absent, extracts the 29 MB
+    `runtime.tar` into a brand new temp directory on *every* file open: seconds
+    of latency and ~56 MB of temp files per open, cleaned up only by the OS.
+    Mirroring the source runtime over the bundled one keeps the resolver on its
+    bundled-runtime fast path.
+    """
+    source = flutter_app / "assets" / "engines" / "helix" / "runtime"
+    target = product_dir / HELIX_RUNTIME_RELATIVE
+    if not source.is_dir():
+        print(f"==> Helix runtime assets missing at {source}; skipping mirror", flush=True)
+        return
+    if not target.is_dir():
+        print(f"==> Bundled Helix runtime missing at {target}; skipping mirror", flush=True)
+        return
+
+    copied = 0
+    for root_dir, _dirs, files in os.walk(source):
+        relative = Path(root_dir).relative_to(source)
+        destination = target / relative
+        destination.mkdir(parents=True, exist_ok=True)
+        for name in files:
+            shutil.copy2(Path(root_dir) / name, destination / name)
+            copied += 1
+
+    print(
+        f"==> Mirrored {copied} Helix runtime files into {target}",
+        flush=True,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--debug", action="store_true")
@@ -123,6 +169,8 @@ def main() -> int:
         raise FileNotFoundError(
             f"expected app missing: {exe}. Build it first or omit --skip-app-build."
         )
+
+    sync_helix_runtime_assets(flutter_app, product_dir)
 
     print(f"==> Copying {product_dir} -> {portable}", flush=True)
     muse_res = portable / "muse"
