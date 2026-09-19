@@ -270,6 +270,9 @@ final class HelixLanguageServerInstaller extends ChangeNotifier {
       next.add(await _statusFor(package));
     }
     statuses = next;
+    // Resolution results changed, so the generated languages.toml must be
+    // rebuilt on the next write instead of being served from the cache.
+    _languagesTomlSignature = null;
     notifyListeners();
   }
 
@@ -456,8 +459,30 @@ final class HelixLanguageServerInstaller extends ChangeNotifier {
     }
   }
 
-  Future<void> writeLanguagesToml() async {
+  /// Signature of the last written languages.toml, so repeated calls on the
+  /// file-open path do not re-resolve every language server.
+  String? _languagesTomlSignature;
+
+  Future<void> writeLanguagesToml({bool force = false}) async {
     await ensureRoot();
+    final file = File(p.join(xdgConfigHome.path, 'helix', 'languages.toml'));
+    // Resolving the catalog walks PATH for each language server (~340 ms with
+    // 7 packages here) and this sits on the path of every Helix file open, so
+    // skip the whole rebuild unless the installer state actually changed.
+    final signature = Object.hash(
+      revision,
+      Object.hashAll([
+        for (final entry in overrides.entries)
+          Object.hash(
+            entry.key,
+            entry.value.commandPath,
+            entry.value.configPath,
+          ),
+      ]),
+    ).toString();
+    if (!force && signature == _languagesTomlSignature && file.existsSync()) {
+      return;
+    }
     final blocks = <String>[
       'use-grammars = { only = ${jsonEncode(helixHighlightGrammars)} }',
     ];
@@ -498,9 +523,9 @@ final class HelixLanguageServerInstaller extends ChangeNotifier {
       }
     }
     final text = '${blocks.join('\n\n')}\n';
-    final file = File(p.join(xdgConfigHome.path, 'helix', 'languages.toml'));
     await file.parent.create(recursive: true);
     await file.writeAsString(text);
+    _languagesTomlSignature = signature;
   }
 
   Future<void> _compileGrammars({
