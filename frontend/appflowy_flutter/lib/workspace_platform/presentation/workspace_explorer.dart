@@ -6,6 +6,8 @@ import 'package:appflowy/plugins/resource_surface/resource_file_plugin.dart';
 import 'package:appflowy/plugins/resource_surface/resource_open_request.dart';
 import 'package:appflowy/plugins/resource_surface/resource_surface_dialog.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_action_registry.dart';
+import 'package:appflowy/plugins/resource_surface/helix/helix_settings.dart';
+import 'package:appflowy/plugins/resource_surface/helix/helix_warm_pool.dart';
 import 'package:appflowy/startup/plugin/plugin.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
@@ -66,10 +68,31 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
     }
   }
 
-  Future<void> _open() => _controller.open(
-        accountSpaceRef: widget.accountSpaceRef,
-        title: widget.accountSpaceTitle,
+  Future<void> _open() async {
+    await _controller.open(
+      accountSpaceRef: widget.accountSpaceRef,
+      title: widget.accountSpaceTitle,
+    );
+    _warmHelixForWorkspace();
+  }
+
+  /// Starts one file-less Helix process for the first mounted folder so the
+  /// session's first code file does not pay Helix's process start either.
+  /// Best effort: the pool logs and gives up on failure.
+  void _warmHelixForWorkspace() {
+    if (!getIt.isRegistered<HelixSettingsController>()) return;
+    for (final mount in _controller.mounts) {
+      final locator = _controller.roots[mount.mountRef]?.locator;
+      if (locator == null || locator.isEmpty) continue;
+      unawaited(
+        HelixWarmPool.instance.warmUpForWorkspace(
+          getIt<HelixSettingsController>(),
+          locator,
+        ),
       );
+      return;
+    }
+  }
 
   bool get _expanded => widget.expanded ?? _sectionExpanded;
 
