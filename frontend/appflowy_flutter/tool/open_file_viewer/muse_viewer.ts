@@ -16,6 +16,18 @@ declare global {
   interface Window {
     MuseViewer: { open(input: MuseOpenInput): Promise<void> };
     MuseViewerBridge?: { postMessage(value: string): void };
+    // Windows embeds the viewer in Edge WebView2 instead of a Flutter web view:
+    // there is no JavaScript channel, messages travel through the WebView2 host
+    // object (`chrome.webview`) in both directions.
+    chrome?: {
+      webview?: {
+        postMessage(value: unknown): void;
+        addEventListener?(
+          type: 'message',
+          listener: (event: { data: MuseOpenInput }) => void,
+        ): void;
+      };
+    };
   }
 }
 
@@ -30,8 +42,16 @@ const root = document.querySelector<HTMLElement>('#viewer');
 if (!root) throw new Error('viewer root missing');
 let viewer: FileViewer | undefined;
 
-const reply = (value: Record<string, unknown>) =>
-  window.MuseViewerBridge?.postMessage(JSON.stringify(value));
+const hostView = window.chrome?.webview;
+
+const reply = (value: Record<string, unknown>) => {
+  const payload = JSON.stringify(value);
+  if (window.MuseViewerBridge) {
+    window.MuseViewerBridge.postMessage(payload);
+    return;
+  }
+  hostView?.postMessage(payload);
+};
 
 const decode = (value: string): Uint8Array => {
   const raw = atob(value);
@@ -92,3 +112,7 @@ window.MuseViewer = {
 };
 
 window.addEventListener('beforeunload', () => viewer?.destroy());
+
+hostView?.addEventListener?.('message', (event) => {
+  void window.MuseViewer.open(event.data);
+});
