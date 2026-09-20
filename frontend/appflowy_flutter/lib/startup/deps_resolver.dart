@@ -20,6 +20,7 @@ import 'package:appflowy/user/presentation/router.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_agent_controller.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_language_servers.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_settings.dart';
+import 'package:appflowy/plugins/resource_surface/muse_presentation_channel.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_action_registry.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_actions.dart';
 import 'package:appflowy/plugins/version_diff/application/text_version_diff_service.dart';
@@ -75,6 +76,12 @@ class DependencyResolver {
     _resolveHomeDeps(getIt);
     _resolveFolderDeps(getIt);
     _resolveCommonService(getIt, mode);
+
+    // Install the Host→Flutter presentation dispatch channel once for the
+    // lifetime of the app: until this succeeds the Rust
+    // `muse.resource-presentation` provider fails closed with
+    // `SURFACE_UNAVAILABLE`, so a click in the DSH panel can open nothing.
+    MusePresentationChannelHost.instance.install();
   }
 }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:appflowy/plugins/document/presentation/editor_plugins/copy_and_paste/clipboard_service.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/plugins.dart';
+import 'package:appflowy/shared/muse_reference_clipboard.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
@@ -70,17 +71,54 @@ KeyEventResult handleCopyCommand(
     html = documentToHTML(document);
   }
 
+  // Muse resource-reference payload (RCX-01). It rides the clipboard next to
+  // the plain text, so pasting into DSH produces a reference chip while
+  // pasting anywhere else keeps the text. Absent when no Muse surface is
+  // attached, and then this stays a plain copy.
+  final museReference = _museReferencePayload(editorState, selection, text);
+
   () async {
     await getIt<ClipboardService>().setData(
       ClipboardServiceData(
         plainText: text,
-        html: html,
+        html: museReference == null
+            ? html
+            : museReferenceHtmlCarrier(html, museReference),
         inAppJson: inAppJson,
+        museReference: museReference,
       ),
     );
   }();
 
   return KeyEventResult.handled;
+}
+
+/// Encode the Muse reference payload for one copied selection.
+///
+/// The editor holds text, not source identity, so the payload is described by
+/// the `MuseSelectionReferenceRegistry` source attached by the live document or
+/// Word surface. Returns null when no source is attached.
+String? _museReferencePayload(
+  EditorState editorState,
+  Selection selection,
+  String? selectedText,
+) {
+  if (selectedText == null || MuseSelectionReferenceRegistry.instance.source == null) {
+    return null;
+  }
+  final startPath = selection.start.path;
+  final endPath = selection.end.path;
+  if (startPath.isEmpty || endPath.isEmpty) {
+    return null;
+  }
+  final reference = MuseSelectionReferenceRegistry.instance.describe(
+    selectedText: selectedText,
+    startBlock: startPath.first,
+    endBlock: endPath.first,
+    startBlockRef: editorState.getNodeAtPath(startPath)?.id,
+    endBlockRef: editorState.getNodeAtPath(endPath)?.id,
+  );
+  return reference?.encode();
 }
 
 Document _buildCopiedDocument(

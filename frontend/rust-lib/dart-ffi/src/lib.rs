@@ -35,6 +35,7 @@ mod c;
 mod env_serde;
 mod model;
 mod muse_diff_text_ffi;
+mod muse_presentation_ffi;
 mod notification;
 mod protobuf;
 

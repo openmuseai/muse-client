@@ -6,12 +6,14 @@ import 'package:appflowy/plugins/document/application/document_awareness_metadat
 import 'package:appflowy/plugins/document/application/document_collab_adapter.dart';
 import 'package:appflowy/plugins/document/application/document_data_pb_extension.dart';
 import 'package:appflowy/plugins/document/application/document_listener.dart';
+import 'package:appflowy/plugins/document/application/muse_document_selection_reference.dart';
 import 'package:appflowy/plugins/document/application/muse_markdown_ui_facet.dart';
 import 'package:appflowy/plugins/document/application/document_rules.dart';
 import 'package:appflowy/plugins/document/application/document_service.dart';
 import 'package:appflowy/plugins/document/application/editor_transaction_adapter.dart';
 import 'package:appflowy/plugins/trash/application/trash_service.dart';
 import 'package:appflowy/shared/feature_flags.dart';
+import 'package:appflowy/shared/muse_reference_clipboard.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/startup/tasks/app_widget.dart';
 import 'package:appflowy/startup/tasks/device_info_task.dart';
@@ -21,6 +23,7 @@ import 'package:appflowy/util/color_to_hex_string.dart';
 import 'package:appflowy/util/debounce.dart';
 import 'package:appflowy/util/throttle.dart';
 import 'package:appflowy/workspace/application/view/view_listener.dart';
+import 'package:appflowy/workspace/application/view/view_service.dart';
 import 'package:appflowy/workspace/presentation/widgets/dialogs.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-document/entities.pb.dart';
@@ -90,6 +93,7 @@ class DocumentBloc extends Bloc<DocumentEvent, DocumentState> {
 
   StreamSubscription? _transactionSubscription;
   MarkdownUiSurfaceBinding? _museMarkdownSurface;
+  MuseDocumentSelectionReference? _museSelectionReference;
 
   bool isClosing = false;
 
@@ -118,6 +122,11 @@ class DocumentBloc extends Bloc<DocumentEvent, DocumentState> {
     await checkDocumentIntegrity();
     await _museMarkdownSurface?.close();
     _museMarkdownSurface = null;
+    final museSelectionReference = _museSelectionReference;
+    if (museSelectionReference != null) {
+      MuseSelectionReferenceRegistry.instance.detach(museSelectionReference);
+      _museSelectionReference = null;
+    }
     await _cancelSubscriptions();
     _clearEditorState();
     return super.close();
@@ -181,6 +190,7 @@ class DocumentBloc extends Bloc<DocumentEvent, DocumentState> {
             documentId,
             onExternalReconcile: forceReloadDocumentState,
           );
+          await _attachMuseSelectionReference();
         }
         if (newState.userProfilePB != null) {
           await _updateCollaborator();
@@ -221,9 +231,45 @@ class DocumentBloc extends Bloc<DocumentEvent, DocumentState> {
     );
   }
 
+  /// Attach this document as the Muse reference source of the copy command.
+  ///
+  /// The view title is resolved here so a copy taken before the first selection
+  /// notification still carries a display name; a title that cannot be fetched
+  /// falls back to the document id.
+  Future<void> _attachMuseSelectionReference() async {
+    if (_museSelectionReference != null || isClosing) {
+      return;
+    }
+    var title = documentId;
+    try {
+      final view = (await ViewBackendService.getView(documentId)).toNullable();
+      final name = view?.name.trim();
+      if (name != null && name.isNotEmpty) {
+        title = name;
+      }
+    } catch (error) {
+      Log.warn('Muse reference: view title unavailable for $documentId: $error');
+    }
+    if (isClosing || _museSelectionReference != null) {
+      return;
+    }
+    final source = MuseDocumentSelectionReference(
+      viewId: documentId,
+      displayName: title,
+    );
+    _museSelectionReference = source;
+    MuseSelectionReferenceRegistry.instance.attach(source);
+  }
+
   /// subscribe to the view(document page) change
   void _onViewChanged() {
     _viewListener?.start(
+      // A rename while this document is open must reach the attached Muse
+      // reference source, or the next copied reference would carry the stale
+      // title. The view id is already stable, so only the name is refreshed.
+      onViewUpdated: (view) {
+        _museSelectionReference?.displayName = view.name;
+      },
       onViewMoveToTrash: (r) {
         r.map((r) => add(const DocumentEvent.moveToTrash()));
       },

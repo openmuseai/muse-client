@@ -33,6 +33,10 @@ PNPM_SPEC = os.environ.get("MUSE_PNPM_SPEC", "pnpm@10.34.5")
 VENDORED_PLUGIN_DIRS = (
     ("plugins/dsh-model-capabilities", "dsh-model-capabilities"),
     ("plugins/dsh-client-ui-workspace-binding", "@muse/dsh-client-ui-workspace-binding"),
+    (
+        "plugins/dsh-client-ui-resource-reference",
+        "@muse/dsh-client-ui-resource-reference",
+    ),
 )
 
 PACKAGE_DIRS = (

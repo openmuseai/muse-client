@@ -71,6 +71,7 @@ muse-host-policy = { path = "../../../../../middlewares/dsh/core/protocol/host-b
 muse-host-events = { path = "../../../../../middlewares/dsh/core/protocol/host-bridge/rust/host-events" }
 muse-plugin-facets = { path = "../../../../../middlewares/dsh/core/plugin-facets/rust" }
 muse-document-contract = { path = "../../../../../middlewares/dsh/core/contract-document/rust" }
+muse-presentation-contract = { path = "../../../../../middlewares/dsh/core/contract-presentation/rust" }
 
 
 [target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]

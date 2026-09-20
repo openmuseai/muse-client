@@ -53,6 +53,10 @@ mod log_filter;
 pub mod module;
 mod muse_host;
 mod muse_markdown;
+/// Contract-major-2 `muse.resource-presentation` provider and its Flutter
+/// surface seam. Public so the Flutter layer can install a
+/// [`muse_presentation::MuseResourceSurfaceDispatcher`].
+pub mod muse_presentation;
 mod muse_workspace;
 mod muse_word;
 #[cfg(any(unix, windows))]

@@ -74,16 +74,34 @@ impl MuseHostProviders {
       .expect("static Muse AppFlowy Markdown Provider registration must succeed");
     let word_lease = registry
       .register(Arc::new(crate::muse_word::WordProvider::new(
-        folder_manager,
+        folder_manager.clone(),
         user_manager,
       )))
       .await
       .expect("static Muse AppFlowy Word Provider registration must succeed");
-    owner
-      .leases
-      .lock()
+    let presentation_state =
+      crate::muse_presentation::PresentationState::for_folder(folder_manager);
+    let locator_lease = registry
+      .register(Arc::new(
+        crate::muse_presentation::LocatorProvider::with_state(presentation_state.clone()),
+      ))
       .await
-      .extend([lease, workspace_lease, rename_lease, markdown_lease, word_lease]);
+      .expect("static Muse AppFlowy resource locator Provider registration must succeed");
+    let presentation_lease = registry
+      .register(Arc::new(
+        crate::muse_presentation::PresentationProvider::with_state(presentation_state),
+      ))
+      .await
+      .expect("static Muse AppFlowy resource presentation Provider registration must succeed");
+    owner.leases.lock().await.extend([
+      lease,
+      workspace_lease,
+      rename_lease,
+      markdown_lease,
+      word_lease,
+      locator_lease,
+      presentation_lease,
+    ]);
     owner
   }
 

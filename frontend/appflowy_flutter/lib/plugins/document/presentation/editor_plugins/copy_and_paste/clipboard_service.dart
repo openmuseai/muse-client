@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:appflowy/shared/muse_reference_clipboard.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:flutter/foundation.dart';
 import 'package:super_clipboard/super_clipboard.dart';
@@ -21,6 +22,19 @@ const tableJsonFormat = CustomValueFormat<String>(
   onEncode: _defaultEncode,
 );
 
+/// Muse Host → DSH resource-reference payload (RCX-01).
+///
+/// The same JSON also rides the copied HTML as a marker attribute, because a
+/// browser `paste` event cannot see a custom platform format; this item exists
+/// for Host-to-Host copy/paste and for readers that can enumerate clipboard
+/// formats. See [museReferencePlatformType] and the format spec in
+/// `middlewares/dsh/plugins/dsh-client-ui-resource-reference/README.md`.
+const museReferenceFormat = CustomValueFormat<String>(
+  applicationId: museReferencePlatformType,
+  onDecode: _defaultDecode,
+  onEncode: _defaultEncode,
+);
+
 class ClipboardServiceData {
   const ClipboardServiceData({
     this.plainText,
@@ -28,6 +42,7 @@ class ClipboardServiceData {
     this.image,
     this.inAppJson,
     this.tableJson,
+    this.museReference,
   });
 
   /// The [plainText] is the plain text string.
@@ -58,6 +73,13 @@ class ClipboardServiceData {
   /// It only works for the table nodes when coping a row or a column.
   /// Don't use it for another scenario.
   final String? tableJson;
+
+  /// The [museReference] is the Muse resource-reference payload JSON.
+  ///
+  /// It is written alongside the plain text and HTML fallbacks; the DSH
+  /// composer reads the copy of it embedded in [html] (see
+  /// [MuseResourceReference.encode]).
+  final String? museReference;
 }
 
 class ClipboardService {
@@ -74,6 +96,7 @@ class ClipboardService {
     final inAppJson = data.inAppJson;
     final image = data.image;
     final tableJson = data.tableJson;
+    final museReference = data.museReference;
 
     final item = DataWriterItem();
     if (plainText != null) {
@@ -87,6 +110,9 @@ class ClipboardService {
     }
     if (tableJson != null) {
       item.add(tableJsonFormat(tableJson));
+    }
+    if (museReference != null) {
+      item.add(museReferenceFormat(museReference));
     }
     if (image != null && image.$2?.isNotEmpty == true) {
       switch (image.$1) {
@@ -132,6 +158,7 @@ class ClipboardService {
     final html = await reader.readValue(Formats.htmlText);
     final inAppJson = await reader.readValue(inAppJsonFormat);
     final tableJson = await reader.readValue(tableJsonFormat);
+    final museReference = await reader.readValue(museReferenceFormat);
     final uri = await reader.readValue(Formats.uri);
     (String, Uint8List?)? image;
     if (reader.canProvide(Formats.png)) {
@@ -150,6 +177,7 @@ class ClipboardService {
       image: image,
       inAppJson: inAppJson,
       tableJson: tableJson,
+      museReference: museReference,
     );
   }
 }

@@ -129,7 +129,15 @@ final class MuseLocalResourceRouter {
         : File(
             p.join(request.sessionCwd ?? Directory.current.path, request.path),
           );
-    final canonical = File(await candidate.resolveSymbolicLinks());
+    // A path that cannot be resolved (missing file, dangling link, unreadable
+    // parent) is "not a file" — the same refusal the type check below reports,
+    // instead of an untyped FileSystemException callers cannot map.
+    final File canonical;
+    try {
+      canonical = File(await candidate.resolveSymbolicLinks());
+    } on FileSystemException {
+      throw const MuseResourceOpenException('NOT_A_FILE');
+    }
     final stat = await canonical.stat();
     if (stat.type != FileSystemEntityType.file) {
       throw const MuseResourceOpenException('NOT_A_FILE');
