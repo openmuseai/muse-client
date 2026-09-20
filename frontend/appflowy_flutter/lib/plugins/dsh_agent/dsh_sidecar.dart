@@ -66,6 +66,7 @@ class DshSidecar {
         _seedMuseModules(layout);
         _seedDshMarket(layout);
       }
+      clearLeakedHostPackages(layout);
       _logTail.clear();
       _logRemainder = '';
       _sessionUrl = null;
@@ -207,6 +208,66 @@ class DshSidecar {
         ? connector.lastModifiedSync().millisecondsSinceEpoch
         : 0;
     return '3\t${resolved.museRoot}\t$version\t$stamp';
+  }
+
+  /// Drop host packages that leaked into a profile's own `node_modules`.
+  ///
+  /// Node resolves a bare `@deepseek-ai/*` specifier from the profile directory
+  /// before the installation fallback, so a leftover copy there shadows the
+  /// bundled closure. When only a subset was copied — an older pack, or another
+  /// build sharing this DSH home — the Loader fails for exactly those packages
+  /// with `ERR_MODULE_NOT_FOUND` and "Did you mean …/lib/index.js?", the
+  /// sidecar exits 1, and the UI only shows `Bad state: DSH sidecar exited with
+  /// 1` plus a Node stack.
+  ///
+  /// [seedClosurePlugins] already removes that scope, but only when it re-seeds,
+  /// and its generation marker stays valid across boots — so a leak created
+  /// afterwards (by an older install, or a rebranded build using the same home)
+  /// survives every later start. Cleaning has to happen on every start.
+  static void clearLeakedHostPackages(DshRuntimeLayout resolved) {
+    // Host packages must never live in a profile: the install fallback in
+    // `$DSH_HOME/profiles/node_modules` supplies them (that is the invariant
+    // seedClosurePlugins enforces when it re-seeds).
+    final profileScope = Directory(
+      '${resolved.dshHome}/profiles/web/node_modules/@deepseek-ai',
+    );
+    if (profileScope.existsSync()) {
+      try {
+        profileScope.deleteSync(recursive: true);
+      } catch (_) {}
+    }
+    // The fallback itself is dsh's: keep its links and its proxy packages and
+    // drop only entries dsh does not manage, which are the same leaks seen from
+    // the shared directory.
+    final fallbackScope = Directory(
+      '${resolved.dshHome}/profiles/node_modules/@deepseek-ai',
+    );
+    if (!fallbackScope.existsSync()) return;
+    for (final entity in fallbackScope.listSync()) {
+      if (FileSystemEntity.typeSync(entity.path, followLinks: false) ==
+          FileSystemEntityType.link) {
+        continue;
+      }
+      if (entity is Directory && _isDshModuleProxy(entity)) continue;
+      try {
+        entity.deleteSync(recursive: true);
+      } catch (_) {}
+    }
+  }
+
+  /// Whether [package] is one of dsh's own module-fallback proxies, which it
+  /// records as `dsh.moduleFallback` in the package manifest.
+  static bool _isDshModuleProxy(Directory package) {
+    final manifest = File('${package.path}/package.json');
+    if (!manifest.existsSync()) return false;
+    try {
+      final data = jsonDecode(manifest.readAsStringSync());
+      if (data is! Map) return false;
+      final dsh = data['dsh'];
+      return dsh is Map && dsh['moduleFallback'] is Map;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Closure (npm) layout: seed real copies of the @muse + dshmarket plugin
