@@ -221,10 +221,21 @@ void main() {
         },
       }),
     );
+    // A healthy fallback entry: a link into this installation whose package
+    // really resolves, so the repair must keep it.
+    final good = Directory(
+      '${root.path}/closure/node_modules/@deepseek-ai/good',
+    )..createSync(recursive: true);
+    File('${good.path}/package.json').writeAsStringSync(
+      jsonEncode({'name': '@deepseek-ai/good', 'main': 'lib/index.js'}),
+    );
+    File('${good.path}/lib/index.js')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('export {}\n');
     var linked = false;
     try {
       Link('${fallback.path}/dsh-client-ui-workflow-run')
-          .createSync('${root.path}/closure/node_modules/@deepseek-ai/dsh');
+          .createSync(good.path);
       linked = true;
     } catch (_) {}
 
@@ -238,10 +249,10 @@ void main() {
 
     DshSidecar.clearLeakedHostPackages(layout);
     expect(
-      Directory('${dshHome.path}/profiles/web/node_modules/@deepseek-ai')
+      Directory('${dshHome.path}/profiles/web/node_modules/@deepseek-ai/cordis')
           .existsSync(),
       isFalse,
-      reason: 'the profile must never shadow the installation fallback',
+      reason: 'a manifest-less copy must never shadow the installation',
     );
     expect(fallbackLeak.existsSync(), isFalse);
     expect(File('${proxy.path}/package.json').existsSync(), isTrue);
@@ -252,6 +263,131 @@ void main() {
           followLinks: false,
         ),
         FileSystemEntityType.link,
+      );
+    }
+  });
+
+  test('module fallback repair drops every entry that cannot resolve', () {
+    // Node stops at the first node_modules holding a directory with the
+    // package's name, so an entry that cannot resolve shadows the installation
+    // fallback for the whole profile: a plain directory, a dangling link, a
+    // half-written copy (manifest but no entry file), or a link into another
+    // installation. All of them must go, and dsh re-heals what it needs.
+    final root = Directory.systemTemp.createTempSync('muse-fallback-repair-');
+    addTearDown(() => root.deleteSync(recursive: true));
+    File('${root.path}/patch.yml').writeAsStringSync('[]\n');
+    final installation = '${root.path}/closure/node_modules/@deepseek-ai';
+
+    void addPackage(String dir, {String? main, bool writeEntry = true}) {
+      Directory(dir).createSync(recursive: true);
+      File('$dir/package.json').writeAsStringSync(
+        jsonEncode({
+          'name': '@deepseek-ai/${dir.split('/').last}',
+          if (main != null) 'main': main,
+        }),
+      );
+      if (main == null || !writeEntry) return;
+      final entry = File('$dir/$main');
+      entry.parent.createSync(recursive: true);
+      entry.writeAsStringSync('export {}\n');
+    }
+
+    addPackage('$installation/good', main: 'lib/index.js');
+    addPackage('$installation/halfcopied', main: 'lib/index.js', writeEntry: false);
+    // Another installation lives outside this one's museRoot.
+    final foreignRoot = Directory.systemTemp.createTempSync('muse-foreign-');
+    addTearDown(() => foreignRoot.deleteSync(recursive: true));
+    addPackage('${foreignRoot.path}/elsewhere/foreign', main: 'lib/index.js');
+
+    final dshHome = Directory('${root.path}/dsh-home')..createSync();
+    final layout = DshRuntimeLayout(
+      bundled: true,
+      museRoot: root.path,
+      dshHome: dshHome.path,
+      harnessDir: '${root.path}/closure',
+      patchFile: '${root.path}/patch.yml',
+      nodeBin: '${root.path}/node/node.exe',
+      credentialsFile: '${root.path}/credentials.env',
+      closureEntry:
+          '${root.path}/closure/node_modules/@deepseek-ai/dsh/lib/bin.js',
+    );
+    final profileScope = Directory(
+      '${dshHome.path}/profiles/web/node_modules/@deepseek-ai',
+    )..createSync(recursive: true);
+    final fallbackScope = Directory(
+      '${dshHome.path}/profiles/node_modules/@deepseek-ai',
+    )..createSync(recursive: true);
+    final ownedScope = Directory(
+      '${dshHome.path}/profiles/web/.dsh-module-fallback/node_modules/@deepseek-ai',
+    )..createSync(recursive: true);
+
+    // A manifest-less copy and a half-written package: both are what the
+    // sidecar dies on, because Node reports them as
+    // `Cannot find package …/index.js` + "Did you mean …/lib/index.js?".
+    Directory('${profileScope.path}/cordis').createSync(recursive: true);
+    final halfCopied = Directory('${profileScope.path}/dsh-client-hmr')
+      ..createSync(recursive: true);
+    File('${halfCopied.path}/package.json').writeAsStringSync(
+      jsonEncode({'name': '@deepseek-ai/dsh-client-hmr', 'main': 'lib/index.js'}),
+    );
+    Directory('${ownedScope.path}/dsh-llm').createSync(recursive: true);
+
+    var linked = false;
+    try {
+      Link('${profileScope.path}/dsh-client-ui-chat').createSync('$installation/good');
+      Link('${profileScope.path}/dsh-client-ui-jobs').createSync('$installation/halfcopied');
+      Link('${profileScope.path}/dsh-client-ui-goal').createSync('${foreignRoot.path}/elsewhere/foreign');
+      Link('${profileScope.path}/dsh-client-ui-plan').createSync('${root.path}/does-not-exist');
+      Link('${fallbackScope.path}/dsh-client-ui-reference').createSync('$installation/halfcopied');
+      Link('${ownedScope.path}/dsh-session').createSync('$installation/halfcopied');
+      linked = true;
+    } catch (_) {}
+
+    DshSidecar.clearLeakedHostPackages(layout);
+
+    expect(Directory('${profileScope.path}/cordis').existsSync(), isFalse);
+    expect(halfCopied.existsSync(), isFalse);
+    expect(
+      Directory('${ownedScope.path}/dsh-llm').existsSync(),
+      isFalse,
+      reason: 'the profile-owned fallback is a resolution step too',
+    );
+    if (linked) {
+      // The only entry that resolves into this installation survives.
+      expect(
+        FileSystemEntity.typeSync(
+          '${profileScope.path}/dsh-client-ui-chat',
+          followLinks: false,
+        ),
+        FileSystemEntityType.link,
+      );
+      for (final gone in const [
+        'dsh-client-ui-jobs', // link to a package whose entry file is missing
+        'dsh-client-ui-goal', // link into another installation
+        'dsh-client-ui-plan', // dangling link
+      ]) {
+        expect(
+          FileSystemEntity.typeSync(
+            '${profileScope.path}/$gone',
+            followLinks: false,
+          ),
+          FileSystemEntityType.notFound,
+          reason: '$gone cannot resolve and must be rebuilt by dsh',
+        );
+      }
+      expect(
+        FileSystemEntity.typeSync(
+          '${fallbackScope.path}/dsh-client-ui-reference',
+          followLinks: false,
+        ),
+        FileSystemEntityType.notFound,
+      );
+      expect(
+        FileSystemEntity.typeSync(
+          '${ownedScope.path}/dsh-session',
+          followLinks: false,
+        ),
+        FileSystemEntityType.notFound,
       );
     }
   });

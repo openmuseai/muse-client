@@ -67,56 +67,73 @@ class DshSidecar {
         _seedDshMarket(layout);
       }
       clearLeakedHostPackages(layout);
-      _logTail.clear();
-      _logRemainder = '';
-      _sessionUrl = null;
-      _launchToken = null;
-      await _reclaimListenPort();
-      _stopping = false;
-      _process = await _spawn(key);
-      var exited = false;
-      unawaited(
-        _process!.exitCode.then((code) {
-          exited = true;
-          _launchToken = null;
-          _sessionUrl = null;
-          if (_stopping || !controller.ready) return;
-          controller.setReady(false);
-          controller.setError(
-            DshWebAuth.summarizeExit(code, _logTail),
-            code: DshDesktopError.sidecarExit,
-          );
-        }),
-      );
-      unawaited(
-        _process!.stdout.transform(utf8.decoder).forEach((chunk) {
-          _rememberLog(chunk, key);
-          debugPrint('[dsh-sidecar] $chunk');
-        }),
-      );
-      unawaited(
-        _process!.stderr.transform(utf8.decoder).forEach((chunk) {
-          _rememberLog(chunk, key);
-          debugPrint('[dsh-sidecar:err] $chunk');
-        }),
-      );
-      final deadline = DateTime.now().add(const Duration(seconds: 90));
-      while (DateTime.now().isBefore(deadline)) {
-        if (await _isReady() && await _stayedReady()) {
-          final sessionUrl = _sessionUrl;
-          if (sessionUrl != null) controller.setUrl(sessionUrl);
-          controller.setError(null);
-          controller.setReady(true);
-          return;
+      var attempt = 0;
+      while (true) {
+        attempt++;
+        if (attempt > 1) {
+          // The previous boot died on a package Node could not resolve: an entry
+          // that cannot resolve shadows the installation fallback for the whole
+          // profile. Rebuild the scopes and start again, so a leak that appeared
+          // after the pre-start repair costs one restart instead of the session.
+          clearLeakedHostPackages(layout);
         }
-        if (exited) {
-          await Future<void>.delayed(const Duration(milliseconds: 200));
-          final code = await _process!.exitCode;
-          throw StateError(DshWebAuth.summarizeExit(code, _logTail));
+        _logTail.clear();
+        _logRemainder = '';
+        _sessionUrl = null;
+        _launchToken = null;
+        await _reclaimListenPort();
+        _stopping = false;
+        _process = await _spawn(key);
+        var exited = false;
+        unawaited(
+          _process!.exitCode.then((code) {
+            exited = true;
+            _launchToken = null;
+            _sessionUrl = null;
+            if (_stopping || !controller.ready) return;
+            controller.setReady(false);
+            controller.setError(
+              DshWebAuth.summarizeExit(code, _logTail),
+              code: DshDesktopError.sidecarExit,
+            );
+          }),
+        );
+        unawaited(
+          _process!.stdout.transform(utf8.decoder).forEach((chunk) {
+            _rememberLog(chunk, key);
+            debugPrint('[dsh-sidecar] $chunk');
+          }),
+        );
+        unawaited(
+          _process!.stderr.transform(utf8.decoder).forEach((chunk) {
+            _rememberLog(chunk, key);
+            debugPrint('[dsh-sidecar:err] $chunk');
+          }),
+        );
+        final deadline = DateTime.now().add(const Duration(seconds: 90));
+        var retry = false;
+        while (DateTime.now().isBefore(deadline)) {
+          if (await _isReady() && await _stayedReady()) {
+            final sessionUrl = _sessionUrl;
+            if (sessionUrl != null) controller.setUrl(sessionUrl);
+            controller.setError(null);
+            controller.setReady(true);
+            return;
+          }
+          if (exited) {
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+            final code = await _process!.exitCode;
+            if (attempt == 1 && _isModuleResolutionFailure()) {
+              retry = true;
+              break;
+            }
+            throw StateError(DshWebAuth.summarizeExit(code, _logTail));
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 500));
         }
-        await Future<void>.delayed(const Duration(milliseconds: 500));
+        if (retry) continue;
+        throw StateError('DSH sidecar did not become ready on ${controller.url}');
       }
-      throw StateError('DSH sidecar did not become ready on ${controller.url}');
     } catch (error) {
       controller.setReady(false);
       final message = error.toString();
@@ -210,64 +227,144 @@ class DshSidecar {
     return '3\t${resolved.museRoot}\t$version\t$stamp';
   }
 
-  /// Drop host packages that leaked into a profile's own `node_modules`.
+  /// Repair every module-fallback scope dsh resolves `@deepseek-ai/*` through.
   ///
   /// Node resolves a bare `@deepseek-ai/*` specifier from the profile directory
-  /// before the installation fallback, so a leftover copy there shadows the
-  /// bundled closure. When only a subset was copied — an older pack, or another
-  /// build sharing this DSH home — the Loader fails for exactly those packages
-  /// with `ERR_MODULE_NOT_FOUND` and "Did you mean …/lib/index.js?", the
-  /// sidecar exits 1, and the UI only shows `Bad state: DSH sidecar exited with
-  /// 1` plus a Node stack.
+  /// first and from `$DSH_HOME/profiles/node_modules` second — but it stops at
+  /// the first `node_modules` directory that holds a directory with the
+  /// package's name. A leftover there wins over a perfectly good installation
+  /// fallback, so one entry that is a plain directory, a dangling link, a link
+  /// into another installation, or a copy whose files were only half written
+  /// makes that package unresolvable for the whole profile. The Loader then
+  /// fails for every affected entry with `ERR_MODULE_NOT_FOUND` and
+  /// "Did you mean …/lib/index.js?", the sidecar exits 1, and the UI only shows
+  /// `Bad state: DSH sidecar exited with 1` plus a Node stack.
   ///
-  /// [seedClosurePlugins] already removes that scope, but only when it re-seeds,
-  /// and its generation marker stays valid across boots — so a leak created
-  /// afterwards (by an older install, or a rebranded build using the same home)
-  /// survives every later start. Cleaning has to happen on every start.
+  /// dsh repairs only what is missing: `ensureProfileSymlink` returns as soon as
+  /// the path exists, whatever it holds, and `moduleFallbackCurrent` trusts a
+  /// link that points at the right directory. Deleting a bad entry is therefore
+  /// what makes `healProfilesModuleFallback` write a healthy one again, which is
+  /// why this runs before every start rather than only when re-seeding.
   static void clearLeakedHostPackages(DshRuntimeLayout resolved) {
-    // Host packages must never live in a profile: the install fallback in
-    // `$DSH_HOME/profiles/node_modules` supplies them (that is the invariant
-    // seedClosurePlugins enforces when it re-seeds).
-    final profileScope = Directory(
-      '${resolved.dshHome}/profiles/web/node_modules/@deepseek-ai',
+    final installation = _normalizePath(resolved.museRoot);
+    final owned = _normalizePath(
+      '${resolved.dshHome}/profiles/web/.dsh-module-fallback',
     );
-    if (profileScope.existsSync()) {
-      try {
-        profileScope.deleteSync(recursive: true);
-      } catch (_) {}
-    }
-    // The fallback itself is dsh's: keep its links and its proxy packages and
-    // drop only entries dsh does not manage, which are the same leaks seen from
-    // the shared directory.
-    final fallbackScope = Directory(
+    for (final path in [
       '${resolved.dshHome}/profiles/node_modules/@deepseek-ai',
-    );
-    if (!fallbackScope.existsSync()) return;
-    for (final entity in fallbackScope.listSync()) {
-      if (FileSystemEntity.typeSync(entity.path, followLinks: false) ==
-          FileSystemEntityType.link) {
-        continue;
-      }
-      if (entity is Directory && _isDshModuleProxy(entity)) continue;
+      '${resolved.dshHome}/profiles/web/node_modules/@deepseek-ai',
+      '${resolved.dshHome}/profiles/web/.dsh-module-fallback/node_modules/@deepseek-ai',
+    ]) {
+      _pruneModuleScope(Directory(path), installation, owned);
+    }
+  }
+
+  /// Drop every entry of one `@deepseek-ai` scope that cannot resolve.
+  static void _pruneModuleScope(
+    Directory scope,
+    String installation,
+    String owned,
+  ) {
+    if (!scope.existsSync()) return;
+    for (final entity in scope.listSync(followLinks: false)) {
+      if (_usableModuleEntry(entity, installation, owned)) continue;
       try {
-        entity.deleteSync(recursive: true);
+        if (FileSystemEntity.typeSync(entity.path, followLinks: false) ==
+            FileSystemEntityType.link) {
+          Link(entity.path).deleteSync();
+        } else {
+          entity.deleteSync(recursive: true);
+        }
       } catch (_) {}
     }
   }
 
-  /// Whether [package] is one of dsh's own module-fallback proxies, which it
-  /// records as `dsh.moduleFallback` in the package manifest.
-  static bool _isDshModuleProxy(Directory package) {
-    final manifest = File('${package.path}/package.json');
-    if (!manifest.existsSync()) return false;
+  /// Whether [entity] is a package Node can actually resolve: a manifest that
+  /// parses, the entry that manifest declares, and a target belonging to this
+  /// installation (or one of dsh's own packaged proxies).
+  static bool _usableModuleEntry(
+    FileSystemEntity entity,
+    String installation,
+    String owned,
+  ) {
+    String resolved;
     try {
-      final data = jsonDecode(manifest.readAsStringSync());
-      if (data is! Map) return false;
-      final dsh = data['dsh'];
-      return dsh is Map && dsh['moduleFallback'] is Map;
+      // Throws for a dangling link, which shadows the installation fallback
+      // just as effectively as a bad copy does.
+      resolved = entity.resolveSymbolicLinksSync();
     } catch (_) {
       return false;
     }
+    if (FileSystemEntity.typeSync(resolved) != FileSystemEntityType.directory) {
+      return false;
+    }
+    final manifest = File('$resolved/package.json');
+    if (!manifest.existsSync()) return false;
+    Map<dynamic, dynamic> data;
+    try {
+      final parsed = jsonDecode(manifest.readAsStringSync());
+      if (parsed is! Map) return false;
+      data = parsed;
+    } catch (_) {
+      return false;
+    }
+    final dsh = data['dsh'];
+    if (dsh is Map && dsh['moduleFallback'] is Map) {
+      // dsh's packaged-executable proxy: dsh resolves it through its own
+      // targets and rewrites it whenever its records are stale.
+      return true;
+    }
+    final home = _normalizePath(resolved);
+    if (!_isInside(home, installation) && !_isInside(home, owned)) {
+      // Another installation (possibly a removed one) owns this entry, so this
+      // installation cannot vouch for it.
+      return false;
+    }
+    if (data['exports'] != null) return true;
+    final main = data['main'];
+    if (main is String && main.trim().isNotEmpty) {
+      return _declaredEntryExists(resolved, main);
+    }
+    return File('$resolved/index.js').existsSync();
+  }
+
+  /// Whether the `main` a manifest declares is present (a file, or a directory
+  /// with the usual index files).
+  static bool _declaredEntryExists(String packagePath, String main) {
+    var relative = main.replaceAll('\\', '/');
+    if (relative.startsWith('./')) relative = relative.substring(2);
+    if (relative.isEmpty || relative.contains('..')) return false;
+    final target = '$packagePath/$relative';
+    if (File(target).existsSync()) return true;
+    if (!Directory(target).existsSync()) return false;
+    for (final candidate in const ['index.js', 'index.mjs', 'index.cjs']) {
+      if (File('$target/$candidate').existsSync()) return true;
+    }
+    return false;
+  }
+
+  /// Canonical form for the path comparisons above: Windows is case
+  /// insensitive and Dart returns `\\?\`-prefixed paths for some volumes.
+  static String _normalizePath(String path) {
+    var value = path.replaceAll('\\', '/');
+    if (value.startsWith('//?/')) value = value.substring(4);
+    while (value.length > 1 && value.endsWith('/')) {
+      value = value.substring(0, value.length - 1);
+    }
+    return value.toLowerCase();
+  }
+
+  static bool _isInside(String path, String root) =>
+      path == root || path.startsWith('$root/');
+
+  /// Whether the captured sidecar output shows a package that could not be
+  /// resolved, which is the one failure a fallback rebuild can fix.
+  bool _isModuleResolutionFailure() {
+    final tail = _logTail.join('\n');
+    return tail.contains('ERR_MODULE_NOT_FOUND') ||
+        tail.contains('Did you mean to import') ||
+        tail.contains('ERR_INVALID_PACKAGE_CONFIG') ||
+        tail.contains('No "exports" main defined');
   }
 
   /// Closure (npm) layout: seed real copies of the @muse + dshmarket plugin
