@@ -1,6 +1,11 @@
 # 智能体输出中的目标标记与本地打开路由：完整设计
 
-状态：**设计稿（未实现）**。范围：Muse 多端客户端（Flutter 桌面/移动 + AppFlowy-Web + DSH Web UI）。
+状态：**设计稿**；其中 DSH 侧最小往返已随 Project Workspace 绑定落地（见下），Host 半部与 RCX 引用侧仍未实现。范围：Muse 多端客户端（Flutter 桌面/移动 + AppFlowy-Web + DSH Web UI）。
+
+> **实施状态（2026-09-20，绑定侧环切）**：
+> - **已落地（DSH sidecar 内）**：`POST /muse/v1/target.open` 作为本设计 §3.4 通路 A 的**生产端**——按本仓 binding 的 Mount 集合解析 `resourceRef` / `mountRef` / 兼容期相对或绝对 `path`（§5.4 规则，越界一律拒绝且不回落任意绝对路径），随后调用 presentation 消费者 `openResource.request(...)`，并对每个 `intentRef` **恰好返回一个终态回执**（`muse.presentation-intent-result/v2`；`opened/focused/fallback/unsupported/rejected/timed-out/failed` + `reasonCode`），失败不静默（对应 RLO-02/03/04/07 的 DSH 侧）。实现：`middlewares/dsh/plugins/dsh-appflowy/src/panel-routes.ts`、`plugins/appflowy-workspace/src/resolve.ts`；实测见 `workspace-platform/11-dsh-binding-development-plan-and-test-matrix.md` §7.6。
+> - **未落地**：Host 承担器（`TargetRouter`、present-open-bridge、WebView2 → Host JS 通道、桌面 host→client 下发）；实例上点击链接只到"进入 Host Bridge 分发并返回失败回执"。
+> - **未落地**：RCX 引用侧（`resource.reference` contribution 类型、`muse/resource-reference` 会话事件、composer 引用 chip、`excerpt ≤ 8 KiB` 截断）——PRD RCX-01..04 已标注"未落地"。
 
 配套文档：[helix-editor-integration.md](./helix-editor-integration.md)（Helix 编辑器本体设计）。
 

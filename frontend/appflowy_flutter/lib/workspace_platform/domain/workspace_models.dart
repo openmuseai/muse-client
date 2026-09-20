@@ -89,9 +89,13 @@ final class MuseWorkspaceSnapshot {
     required this.accountSpaceRef,
     required this.mounts,
     required this.expandedEntryRefs,
+    this.activeMountRef,
   });
 
   final String accountSpaceRef;
   final List<MuseWorkspaceMount> mounts;
   final Set<String> expandedEntryRefs;
+
+  /// Mount the next DSH session should start in; null means the lowest order.
+  final String? activeMountRef;
 }

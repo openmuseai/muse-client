@@ -23,13 +23,16 @@ DSHMARKET_SPEC = os.environ.get("MUSE_DSHMARKET_SPEC", "dshmarket@1.31.1")
 # Bundled pnpm for one-click plugin installs; mirrors the version DSH Desktop pins.
 PNPM_SPEC = os.environ.get("MUSE_PNPM_SPEC", "pnpm@10.34.5")
 
-# Vendored upstream plugins that the composition patch mounts by bare name
+# Vendored upstream plugins that the composition patch mounts by name
 # (`name: dsh-model-capabilities`, see @muse/dsh-appflowy/cordis.patch.yml) and
-# that ship a prebuilt `lib/` (no build step). The Loader resolves bare names
-# from the profile node_modules, so this package must (a) exist in the packed
-# closure and (b) be seeded by DshSidecar.seedClosurePlugins.
+# that ship a prebuilt entry file (no build step): bare names, and @muse-scoped
+# client-UI packages whose shipped file is `lib/` rather than a built `dist/`.
+# The Loader resolves names from the profile node_modules, so each package must
+# (a) exist in the packed closure and (b) for bare names be seeded by
+# DshSidecar.seedClosurePlugins (@muse/* is seeded by the same walk).
 VENDORED_PLUGIN_DIRS = (
     ("plugins/dsh-model-capabilities", "dsh-model-capabilities"),
+    ("plugins/dsh-client-ui-workspace-binding", "@muse/dsh-client-ui-workspace-binding"),
 )
 
 PACKAGE_DIRS = (

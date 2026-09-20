@@ -42,6 +42,7 @@ final class MuseWorkspacePersistence {
         accountSpaceRef: accountSpaceRef,
         mounts: mounts,
         expandedEntryRefs: expanded,
+        activeMountRef: json['activeMountRef'] as String?,
       );
     } on Object {
       return MuseWorkspaceSnapshot(
@@ -62,6 +63,8 @@ final class MuseWorkspacePersistence {
         'accountSpaceRef': snapshot.accountSpaceRef,
         'mounts': snapshot.mounts.map((mount) => mount.toJson()).toList(),
         'expandedEntryRefs': snapshot.expandedEntryRefs.toList()..sort(),
+        if (snapshot.activeMountRef != null)
+          'activeMountRef': snapshot.activeMountRef,
       }),
       flush: true,
     );

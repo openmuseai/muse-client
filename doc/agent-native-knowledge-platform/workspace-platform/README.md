@@ -1,6 +1,6 @@
 # Muse Workspace Platform 设计总览
 
-状态：目标方案 v1 + Local P0 纵向切片已实现（2026-09-16）  
+状态：目标方案 v1 + Local P0 纵向切片 + DSH 绑定 P0 均已实现（绑定 P0 于 2026-09-20 端到端验证）  
 范围：Host（AppFlowy Flutter/Rust）、DSH、资源 Provider、工作区 UI、插件贡献协议  
 前置：沿用 `muse.resource`、Surface Orchestrator、Engine Adapter 与 Host Bridge；Ontology Runtime 仅预留，不在本轮实现。
 
@@ -40,6 +40,9 @@ Account Space
 | [06-plugin-and-ux-design.md](./06-plugin-and-ux-design.md) | Explorer、菜单、Tab、命令系统和视觉交互规范 |
 | [07-development-roadmap.md](./07-development-roadmap.md) | 分期开发计划、迁移、验收门槛、测试与发布策略 |
 | [08-local-p0-implementation-and-acceptance.md](./08-local-p0-implementation-and-acceptance.md) | 本轮实现、Workspace/Version 联合 E2E 与剩余边界 |
+| [09-dsh-binding-product-prd.md](./09-dsh-binding-product-prd.md) | Host Project Workspace ↔ DSH Workspace 绑定的产品文档：对应关系、场景 SC-*、需求 WBD/RLO/RCX/PBU/MPT 与验收 |
+| [10-dsh-binding-architecture-design.md](./10-dsh-binding-architecture-design.md) | 绑定与资源联动的方案设计：现状断点、binding 协议与 materialization、模块设计、分期与测试 |
+| [11-dsh-binding-development-plan-and-test-matrix.md](./11-dsh-binding-development-plan-and-test-matrix.md) | 绑定 P0 的开发计划、测试矩阵（T-01..T-21）与本机端到端验证结果 |
 
 ## 3. 关键决策
 

@@ -28,6 +28,7 @@ void main() {
 
   test('mount browse create reopen then version audit and diff', () async {
     final publishedRoots = <String>[];
+    final publishedActive = <String?>[];
     final registry = MuseWorkspaceProviderRegistry()
       ..register(MuseLocalWorkspaceProvider());
     final persistence = MuseWorkspacePersistence(
@@ -36,8 +37,9 @@ void main() {
     var controller = MuseWorkspaceController(
       providers: registry,
       persistence: persistence,
-      dshPublisher: (_, __, mounts) async {
+      dshPublisher: (_, __, mounts, activeMountRef) async {
         if (mounts.isNotEmpty) publishedRoots.add(mounts.first.rootLocator);
+        publishedActive.add(activeMountRef);
       },
     );
 
@@ -54,16 +56,23 @@ void main() {
       contains('plan.md'),
     );
     expect(publishedRoots, contains(await project.resolveSymbolicLinks()));
+    expect(controller.activeMountRef, controller.mounts.first.mountRef);
+    expect(publishedActive.last, controller.mounts.first.mountRef);
 
     controller.dispose();
     controller = MuseWorkspaceController(
       providers: registry,
       persistence: persistence,
-      dshPublisher: (_, __, ___) async {},
+      dshPublisher: (_, __, ___, ____) async {},
     );
     await controller.open(accountSpaceRef: 'team-1', title: 'Team One');
 
     expect(controller.mounts, hasLength(1));
+    expect(
+      controller.activeMountRef,
+      controller.mounts.first.mountRef,
+      reason: 'the active Mount survives a Host restart',
+    );
     final restoredRoot = controller.roots.values.single;
     expect(controller.expandedEntryRefs, contains(restoredRoot.entryRef));
     expect(

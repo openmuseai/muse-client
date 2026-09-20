@@ -15,6 +15,7 @@ typedef MuseWorkspaceDshPublisher = Future<void> Function(
   String accountSpaceRef,
   String title,
   List<MuseWorkspaceMount> mounts,
+  String? activeMountRef,
 );
 
 final class MuseWorkspaceController extends ChangeNotifier {
@@ -32,11 +33,13 @@ final class MuseWorkspaceController extends ChangeNotifier {
     String accountSpaceRef,
     String title,
     List<MuseWorkspaceMount> mounts,
+    String? activeMountRef,
   ) =>
       DshWorkspaceBridge.publishProjectWorkspace(
         appflowyWorkspaceId: accountSpaceRef,
         title: title,
         mounts: mounts,
+        activeMountRef: activeMountRef,
       );
 
   String? accountSpaceRef;
@@ -54,9 +57,28 @@ final class MuseWorkspaceController extends ChangeNotifier {
   final Map<String, StreamSubscription<void>> _watchers = {};
   String? selectedEntryRef;
 
+  /// Mount the next DSH session should start in; null before the first mount.
+  String? activeMountRef;
+
   void select(String entryRef) {
     if (selectedEntryRef == entryRef) return;
     selectedEntryRef = entryRef;
+    final mountRef = entryByRef(entryRef)?.mountRef;
+    if (mountRef != null && mountRef != activeMountRef) {
+      activeMountRef = mountRef;
+      unawaited(_persist());
+      unawaited(_publishDshBinding());
+    }
+    notifyListeners();
+  }
+
+  /// Marks one Mount as the active Mount for DSH sessions.
+  Future<void> setActiveMount(String mountRef) async {
+    if (activeMountRef == mountRef) return;
+    if (!mounts.any((mount) => mount.mountRef == mountRef)) return;
+    activeMountRef = mountRef;
+    await _persist();
+    await _publishDshBinding();
     notifyListeners();
   }
 
@@ -76,12 +98,14 @@ final class MuseWorkspaceController extends ChangeNotifier {
     children.clear();
     expandedEntryRefs.clear();
     selectedEntryRef = null;
+    activeMountRef = null;
     notifyListeners();
     try {
       final snapshot = await persistence.load(accountSpaceRef);
       if (generation != _generation) return;
       mounts.addAll(snapshot.mounts);
       expandedEntryRefs.addAll(snapshot.expandedEntryRefs);
+      activeMountRef = _resolveActiveMount(snapshot.activeMountRef);
       for (final mount in mounts) {
         await _bindMount(mount, generation);
       }
@@ -117,6 +141,7 @@ final class MuseWorkspaceController extends ChangeNotifier {
       order: mounts.length,
     );
     mounts.add(mount);
+    activeMountRef ??= mount.mountRef;
     await _bindMount(mount, _generation);
     final root = roots[mount.mountRef];
     if (root != null) {
@@ -146,6 +171,7 @@ final class MuseWorkspaceController extends ChangeNotifier {
         order: index,
       );
     }
+    if (activeMountRef == mountRef) activeMountRef = _resolveActiveMount(null);
     await _persist();
     await _publishDshBinding();
     notifyListeners();
@@ -248,6 +274,20 @@ final class MuseWorkspaceController extends ChangeNotifier {
   MuseWorkspaceMount requireMount(String mountRef) =>
       mounts.firstWhere((mount) => mount.mountRef == mountRef);
 
+  /// Active Mount, preferring the persisted choice, then a local Mount.
+  String? _resolveActiveMount(String? preferred) {
+    if (mounts.isEmpty) return null;
+    if (preferred != null && mounts.any((mount) => mount.mountRef == preferred)) {
+      return preferred;
+    }
+    for (final mount in mounts) {
+      if (mount.providerId == MuseLocalWorkspaceProvider.providerId) {
+        return mount.mountRef;
+      }
+    }
+    return mounts.first.mountRef;
+  }
+
   MuseWorkspaceEntry? entryByRef(String entryRef) {
     for (final root in roots.values) {
       if (root.entryRef == entryRef) return root;
@@ -326,6 +366,7 @@ final class MuseWorkspaceController extends ChangeNotifier {
         accountSpaceRef: workspace,
         mounts: List.unmodifiable(mounts),
         expandedEntryRefs: Set.unmodifiable(expandedEntryRefs),
+        activeMountRef: activeMountRef,
       ),
     );
   }
@@ -337,6 +378,7 @@ final class MuseWorkspaceController extends ChangeNotifier {
       workspace,
       accountSpaceTitle,
       List.unmodifiable(mounts),
+      activeMountRef,
     );
   }
 
