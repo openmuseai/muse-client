@@ -71,10 +71,11 @@ class DshSidecar {
       while (true) {
         attempt++;
         if (attempt > 1) {
-          // The previous boot died on a package Node could not resolve: an entry
-          // that cannot resolve shadows the installation fallback for the whole
-          // profile. Rebuild the scopes and start again, so a leak that appeared
-          // after the pre-start repair costs one restart instead of the session.
+          // The previous boot died on a package Node could not resolve, or on a
+          // writer lock whose owner was gone: an entry that cannot resolve
+          // shadows the installation fallback for the whole profile. Rebuild the
+          // scopes and start again, so a leak that appeared after the pre-start
+          // repair costs one restart instead of the session.
           clearLeakedHostPackages(layout);
         }
         _logTail.clear();
@@ -82,6 +83,10 @@ class DshSidecar {
         _sessionUrl = null;
         _launchToken = null;
         await _reclaimListenPort();
+        // Reclaiming the port force-kills a sidecar that still holds it, and a
+        // killed process cannot run the release path of its writer lock, so sweep
+        // orphans after the kill rather than before it.
+        clearOrphanedWriterLocks(layout);
         _stopping = false;
         _process = await _spawn(key);
         var exited = false;
@@ -123,7 +128,8 @@ class DshSidecar {
           if (exited) {
             await Future<void>.delayed(const Duration(milliseconds: 200));
             final code = await _process!.exitCode;
-            if (attempt == 1 && _isModuleResolutionFailure()) {
+            if (attempt == 1 &&
+                (_isModuleResolutionFailure() || _isWriterLockTimeout())) {
               retry = true;
               break;
             }
@@ -259,6 +265,149 @@ class DshSidecar {
     }
   }
 
+  /// Delete writer locks whose owner is gone.
+  ///
+  /// `withFileLock` serializes writers by creating `<file>.lock` exclusively and
+  /// writing its own pid into it. A contender never removes an existing lock
+  /// ("file age cannot prove that its owner stopped; orphan recovery is an
+  /// operator action") and gives up after two seconds. So one sidecar that dies
+  /// mid-write - a crash, a `taskkill`, a power loss - leaves behind a lock that
+  /// fails every later boot with `atomic-write: timed out waiting for the writer
+  /// lock`, which the panel reports as SIDECAR_EXIT. That bricked an install on
+  /// 2026-09-21: the lock held pid 24376, no such process existed, and
+  /// `healProfilesModuleFallback` needs that lock on almost every start because
+  /// [clearLeakedHostPackages] keeps handing it work to do.
+  ///
+  /// Only a lock that provably has no writer is removed: its pid is gone, the
+  /// pid now names something that is not node, or the process started after the
+  /// lock was written (Windows reuses pids). A lock that may still have a live
+  /// writer stays, since two writers could then corrupt the file it protects.
+  static List<String> clearOrphanedWriterLocks(DshRuntimeLayout resolved) =>
+      clearOrphanedWriterLocksIn(resolved.dshHome);
+
+  @visibleForTesting
+  static List<String> clearOrphanedWriterLocksIn(String dshHome) {
+    final home = Directory(dshHome);
+    if (!home.existsSync()) return const <String>[];
+    final removed = <String>[];
+    for (final lock in _writerLocks(home)) {
+      if (!_lockOwnerIsGone(lock)) continue;
+      try {
+        lock.deleteSync();
+        removed.add(lock.path);
+      } catch (_) {}
+    }
+    if (removed.isNotEmpty) {
+      debugPrint('[dsh-sidecar] cleared orphaned writer locks: $removed');
+    }
+    return removed;
+  }
+
+  /// Every `*.lock` a dsh writer may have created under the DSH home. Package
+  /// trees are not descended into: they hold thousands of entries, and these
+  /// locks sit beside such a tree rather than inside it.
+  static Iterable<File> _writerLocks(Directory dir, [int depth = 0]) sync* {
+    if (depth > 4) return;
+    List<FileSystemEntity> children;
+    try {
+      children = dir.listSync(followLinks: false);
+    } catch (_) {
+      return;
+    }
+    for (final child in children) {
+      final name = child.uri.pathSegments
+          .where((segment) => segment.isNotEmpty)
+          .last;
+      if (child is Directory) {
+        if (name == 'node_modules' || name == '.git') continue;
+        if (name.startsWith('.pnpm')) continue;
+        yield* _writerLocks(child, depth + 1);
+      } else if (child is File && name.endsWith('.lock')) {
+        yield child;
+      }
+    }
+  }
+
+  /// Whether the pid recorded in [lock] cannot be the process holding it.
+  static bool _lockOwnerIsGone(File lock) {
+    final pid = _lockOwnerPid(lock);
+    if (pid == null) return false;
+    final owner = _processInfo(pid);
+    if (owner == null) return true;
+    final image = '${owner['image']}';
+    if (!image.contains('node') && !image.contains('dsh')) return true;
+    final started = owner['started'];
+    if (started is! DateTime) return false;
+    DateTime written;
+    try {
+      written = lock.lastModifiedSync();
+    } catch (_) {
+      return false;
+    }
+    // A process cannot have written a lock that predates it.
+    return started.isAfter(written.add(const Duration(seconds: 2)));
+  }
+
+  /// The pid a lock file records, or null when it holds anything else.
+  static int? _lockOwnerPid(File lock) {
+    String text;
+    try {
+      if (lock.lengthSync() > 64) return null;
+      text = lock.readAsStringSync().trim();
+    } catch (_) {
+      return null;
+    }
+    final pid = int.tryParse(text);
+    if (pid == null || pid <= 0) return null;
+    return pid;
+  }
+
+  /// Image name and start time of [pid], or null when no such process exists.
+  static Map<String, Object?>? _processInfo(int pid) {
+    try {
+      if (Platform.isWindows) {
+        final listed = Process.runSync('tasklist', [
+          '/FI',
+          'PID eq $pid',
+          '/FO',
+          'CSV',
+          '/NH',
+        ]);
+        final out = '${listed.stdout}'.trim();
+        if (listed.exitCode != 0 || out.isEmpty || out.startsWith('INFO:')) {
+          return null;
+        }
+        final image = RegExp('^"([^"]+)"').firstMatch(out)?.group(1) ?? '';
+        return <String, Object?>{
+          'image': image.toLowerCase(),
+          'started': _windowsStartTime(pid),
+        };
+      }
+      final listed = Process.runSync('ps', ['-p', '$pid', '-o', 'comm=']);
+      final image = '${listed.stdout}'.trim().toLowerCase();
+      if (listed.exitCode != 0 || image.isEmpty) return null;
+      return <String, Object?>{'image': image, 'started': null};
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Start time of a Windows process, or null when it cannot be read.
+  static DateTime? _windowsStartTime(int pid) {
+    try {
+      final started = Process.runSync('powershell', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '(Get-Process -Id $pid -ErrorAction Stop).StartTime.ToString("o")',
+      ]);
+      if (started.exitCode != 0) return null;
+      return DateTime.tryParse('${started.stdout}'.trim());
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Drop every entry of one `@deepseek-ai` scope that cannot resolve.
   static void _pruneModuleScope(
     Directory scope,
@@ -366,6 +515,12 @@ class DshSidecar {
         tail.contains('ERR_INVALID_PACKAGE_CONFIG') ||
         tail.contains('No "exports" main defined');
   }
+
+  /// Whether the sidecar died waiting for a writer lock, which clearing an
+  /// orphaned lock can fix.
+  bool _isWriterLockTimeout() => _logTail.any(
+    (line) => line.contains('timed out waiting for the writer lock'),
+  );
 
   /// Closure (npm) layout: seed real copies of the @muse + dshmarket plugin
   /// graph into `$DSH_HOME/profiles/web/node_modules`. The Loader anchors
