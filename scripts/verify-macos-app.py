@@ -70,7 +70,13 @@ def verify(app: Path, *, port: str, skip_boot: bool, skip_plugin: bool, package:
         seeded = profile_nm / name / "package.json"
         if not seeded.is_file():
             raise RuntimeError(f"patch row {name} is not seeded: missing {seeded}")
-        if f"name: {name}" not in patch_text:
+        # YAML may quote scoped names (`name: '@muse/...'`).
+        mounted = (
+            f"name: {name}" in patch_text
+            or f"name: '{name}'" in patch_text
+            or f'name: "{name}"' in patch_text
+        )
+        if not mounted:
             raise RuntimeError(f"{muse / 'patch.yml'} does not mount {name}")
         print(f"vendored plugin seeded + mounted: {name}", flush=True)
 
