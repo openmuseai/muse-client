@@ -123,6 +123,62 @@ void main() {
     host.dispose();
   });
 
+  test('publishes the granted Mount catalog the Rust core searches', () {
+    final host = hostWith();
+
+    expect(
+      host.publishMountRoots({
+        'mount:0d71': r'D:\agentic\src\openmuse-io\vendors\helix',
+        'mount:914e': r'D:\agentic\src\openmuse-io\openmuse',
+      }),
+      isTrue,
+    );
+    expect(
+      jsonDecode(transport.publishedMountRoots.single),
+      {
+        'mount:0d71': r'D:\agentic\src\openmuse-io\vendors\helix',
+        'mount:914e': r'D:\agentic\src\openmuse-io\openmuse',
+      },
+    );
+
+    // An empty catalog is meaningful: it retires every Mount this Host no longer
+    // grants, and a blank directory is never one.
+    expect(host.publishMountRoots({'mount:0d71': '   '}), isTrue);
+    expect(jsonDecode(transport.publishedMountRoots.last), <String, Object?>{});
+    expect(refusals, isEmpty);
+
+    host.dispose();
+  });
+
+  test('a refused Mount catalog is reported, never assumed', () {
+    transport.acceptMountRoots = false;
+    final host = hostWith();
+
+    expect(host.publishMountRoots({'mount:0d71': r'D:\helix'}), isFalse);
+    expect(refusals.single, contains('granted Mount catalog'));
+
+    host.dispose();
+  });
+
+  test('a build without the export publishes nothing and warns about nothing',
+      () {
+    final host = MusePresentationChannelHost(
+      transport: _UnavailableTransport(),
+      dispatcher: MuseResourceSurfaceDispatcher(),
+      onRefused: refusals.add,
+      portFactory: () => port,
+    );
+
+    expect(host.publishMountRoots({'mount:0d71': r'D:\helix'}), isFalse);
+    expect(
+      refusals,
+      isEmpty,
+      reason: 'a dart_ffi.dll from before this seam is not a failure',
+    );
+
+    host.dispose();
+  });
+
   test('a dispatch with no requestRef is never answered blindly', () async {
     final host = hostWith();
     expect(host.install(), isTrue);
@@ -176,9 +232,14 @@ final class _Answer {
 
 final class _FakeTransport implements MusePresentationTransport {
   bool acceptInstall = true;
+  bool acceptMountRoots = true;
   int installCalls = 0;
   int? installedPort;
   final List<_Answer> answers = [];
+  final List<String> publishedMountRoots = [];
+
+  @override
+  bool get available => true;
 
   @override
   bool install(int port) {
@@ -193,6 +254,28 @@ final class _FakeTransport implements MusePresentationTransport {
     answers.add(_Answer(requestRef, outcomeJson));
     return true;
   }
+
+  @override
+  bool publishMountRoots(String rootsJson) {
+    if (!acceptMountRoots) return false;
+    publishedMountRoots.add(rootsJson);
+    return true;
+  }
+}
+
+/// A build whose `dart_ffi.dll` predates the presentation exports.
+final class _UnavailableTransport implements MusePresentationTransport {
+  @override
+  bool get available => false;
+
+  @override
+  bool install(int port) => false;
+
+  @override
+  bool complete(String requestRef, String? outcomeJson) => false;
+
+  @override
+  bool publishMountRoots(String rootsJson) => false;
 }
 
 /// Pumps the event loop until [ready] holds or the budget runs out.

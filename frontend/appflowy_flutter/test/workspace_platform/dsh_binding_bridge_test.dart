@@ -130,6 +130,43 @@ void main() {
     );
   });
 
+  test('pushes the granted Mount directories so the core can search them',
+      () async {
+    final pushed = <Map<String, String>>[];
+    final original = DshWorkspaceBridge.publishMountRoots;
+    DshWorkspaceBridge.publishMountRoots = (roots) {
+      pushed.add(Map.of(roots));
+      return true;
+    };
+    addTearDown(() => DshWorkspaceBridge.publishMountRoots = original);
+
+    await DshWorkspaceBridge.publishProjectWorkspace(
+      appflowyWorkspaceId: 'ws-1',
+      title: 'My Workspace',
+      mounts: [
+        _mount('frontend', frontend, order: 0, readOnly: true),
+        _mount('helix', helix, order: 1),
+        _mount('docs', 'ignored', order: 2, providerId: 'muse.workspace.cloud.v1'),
+      ],
+      activeMountRef: 'mount:helix',
+    );
+
+    expect(
+      pushed.single,
+      {'mount:frontend': frontend, 'mount:helix': helix},
+      reason: 'the Rust core searches exactly the Mounts this Host grants',
+    );
+
+    // A workspace without Mounts publishes an empty catalog: the core must stop
+    // searching directories this Host no longer grants.
+    await DshWorkspaceBridge.publishProjectWorkspace(
+      appflowyWorkspaceId: 'ws-1',
+      title: 'My Workspace',
+      mounts: const [],
+    );
+    expect(pushed.last, isEmpty);
+  });
+
   test('bumps the revision, reuses DSH ids and sweeps a removed locator',
       () async {
     await DshWorkspaceBridge.publishProjectWorkspace(

@@ -19,6 +19,13 @@
 //!   [`MusePresentationOutcome::from_wire`]. A null or inadmissible answer
 //!   means "this build cannot present that resource", never "assume it worked".
 //!
+//! A third export, [`muse_presentation_publish_mount_roots`], pushes the Host's
+//! granted Mount directories into the Rust core. A `mountRef` is opaque to the
+//! core, so without those directories the Host cannot search a Mount for a
+//! partial path; publishing them is what turns fuzzy resolution on. The
+//! directories stay inside the Host process: nothing on this seam is a device
+//! path travelling to DSH.
+//!
 //! The dispatch payload carries only opaque refs (a `mountRef` and a
 //! Mount-relative path), and the answer is refused when it embeds a device path
 //! shape, so no path travels back across the bridge.
@@ -26,13 +33,15 @@
 use std::{
   collections::HashMap,
   ffi::{c_char, CStr},
+  path::PathBuf,
   sync::{mpsc, Arc, Mutex, OnceLock},
   time::Duration,
 };
 
 use allo_isolate::Isolate;
 use flowy_core::muse_presentation::{
-  install_muse_resource_surface_dispatcher, MusePresentationDispatch, MusePresentationOutcome,
+  install_muse_mount_root_catalog, install_muse_resource_surface_dispatcher,
+  MuseMountRootCatalog, MusePresentationDispatch, MusePresentationOutcome,
   MuseResourceSurfaceDispatcher,
 };
 use serde_json::Value;
@@ -47,6 +56,26 @@ const MAX_PENDING: usize = 64;
 
 /// Largest answer the bridge accepts, in bytes.
 const MAX_ANSWER_BYTES: usize = 8 * 1024;
+
+/// Mounts one published catalog may hold.
+const MAX_MOUNT_ROOTS: usize = 64;
+
+/// Longest accepted Mount directory, in bytes; mirrors the DSH locator bound.
+const MAX_MOUNT_ROOT_BYTES: usize = 4096;
+
+/// Longest accepted Mount scope reference.
+const MAX_MOUNT_REF_BYTES: usize = 256;
+
+/// Granted Mount directories, as the Flutter layer publishes them.
+struct DartMountRootCatalog {
+  roots: HashMap<String, PathBuf>,
+}
+
+impl MuseMountRootCatalog for DartMountRootCatalog {
+  fn mount_root(&self, mount_ref: &str) -> Option<PathBuf> {
+    self.roots.get(mount_ref).cloned()
+  }
+}
 
 /// Dispatches waiting for the Flutter surface, keyed by `requestRef`.
 fn pending() -> &'static Mutex<HashMap<String, mpsc::Sender<Option<Value>>>> {
@@ -173,6 +202,61 @@ pub unsafe extern "C" fn muse_presentation_complete_dispatch(
   }
 }
 
+/// Publish the Host's granted Mount directories to the Rust core.
+///
+/// `roots_json` is a UTF-8 JSON object of `{"<mountRef>": "<directory>"}` — the
+/// same pair the Flutter workspace controller already publishes inside
+/// `DSH_HOME` for the DSH side. An empty object publishes an empty catalog,
+/// which is the correct answer when the Host has no bound Mount. Returns `1`
+/// when the catalog was installed, `0` when the document was unusable; an
+/// unusable document never half-installs.
+///
+/// # Safety
+///
+/// `roots_json` must be null or a valid NUL-terminated UTF-8 string that stays
+/// alive for the duration of the call. Dart allocates it per call.
+#[no_mangle]
+pub unsafe extern "C" fn muse_presentation_publish_mount_roots(roots_json: *const c_char) -> i32 {
+  if roots_json.is_null() {
+    return 0;
+  }
+  let Ok(text) = CStr::from_ptr(roots_json).to_str() else {
+    warn!("Muse Mount catalog was not UTF-8");
+    return 0;
+  };
+  let Some(catalog) = parse_mount_roots(text) else {
+    warn!("Muse Mount catalog was refused");
+    return 0;
+  };
+  install_muse_mount_root_catalog(Arc::new(catalog));
+  1
+}
+
+/// Parse one published Mount catalog, or `None` when it may not be installed.
+fn parse_mount_roots(text: &str) -> Option<DartMountRootCatalog> {
+  let value: Value = serde_json::from_str(text).ok()?;
+  let Value::Object(fields) = value else {
+    return None;
+  };
+  if fields.len() > MAX_MOUNT_ROOTS {
+    return None;
+  }
+  let mut roots = HashMap::with_capacity(fields.len());
+  for (mount_ref, directory) in fields {
+    let directory = directory.as_str()?;
+    if mount_ref.is_empty()
+      || mount_ref.len() > MAX_MOUNT_REF_BYTES
+      || directory.is_empty()
+      || directory.len() > MAX_MOUNT_ROOT_BYTES
+      || directory.contains('\u{0}')
+    {
+      return None;
+    }
+    roots.insert(mount_ref, PathBuf::from(directory));
+  }
+  Some(DartMountRootCatalog { roots })
+}
+
 /// Whether an answer may cross the bridge: bounded, and free of path shapes.
 ///
 /// The provider re-validates the opaque refs it projects into a receipt; this
@@ -197,7 +281,20 @@ fn carries_no_device_path(value: &Value) -> bool {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use flowy_core::muse_presentation::{
+    clear_muse_mount_root_catalog, muse_mount_root_catalog_available,
+  };
   use serde_json::json;
+
+  /// The granted Mount catalog is process-global, so the tests that publish one
+  /// must not run concurrently with each other.
+  static CATALOG_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+  fn catalog_guard() -> std::sync::MutexGuard<'static, ()> {
+    CATALOG_TESTS
+      .lock()
+      .unwrap_or_else(|poisoned| poisoned.into_inner())
+  }
 
   /// The dispatch JSON the Flutter seam parses. The same literal is asserted
   /// from Dart in
@@ -310,6 +407,58 @@ mod tests {
       "warnings": ["x".repeat(MAX_ANSWER_BYTES)],
     });
     assert!(!answer_is_admissible(&oversized));
+  }
+
+  /// The export the Flutter layer calls: a well-formed catalog installs, an
+  /// unusable one installs nothing.
+  #[test]
+  fn publishing_a_mount_catalog_accepts_only_a_usable_document() {
+    let _guard = catalog_guard();
+    let catalog = parse_mount_roots(r#"{"mount:0d71":"D:\\agentic\\src\\openmuse-io\\vendors\\helix"}"#)
+      .expect("a published catalog must parse");
+    assert_eq!(
+      catalog.mount_root("mount:0d71"),
+      Some(PathBuf::from(r"D:\agentic\src\openmuse-io\vendors\helix"))
+    );
+    assert_eq!(catalog.mount_root("mount:other"), None);
+
+    assert!(parse_mount_roots("{}").is_some(), "an empty catalog is valid");
+    for refused in [
+      "[]",
+      "not json",
+      r#"{"mount:0d71":42}"#,
+      r#"{"mount:0d71":""}"#,
+      r#"{"":"D:\\dir"}"#,
+      &format!(r#"{{"mount:0d71":"{}"}}"#, "x".repeat(MAX_MOUNT_ROOT_BYTES + 1)),
+    ] {
+      assert!(
+        parse_mount_roots(refused).is_none(),
+        "an unusable catalog must be refused: {}",
+        refused
+      );
+    }
+
+    // Through the real export, with a real C string.
+    clear_muse_mount_root_catalog();
+    assert!(!muse_mount_root_catalog_available());
+    let body = std::ffi::CString::new(r#"{"mount:0d71":"D:\\helix"}"#).unwrap();
+    let published = unsafe { muse_presentation_publish_mount_roots(body.as_ptr()) };
+    assert_eq!(published, 1);
+    assert!(muse_mount_root_catalog_available());
+    let refused = std::ffi::CString::new("[]").unwrap();
+    assert_eq!(
+      unsafe { muse_presentation_publish_mount_roots(refused.as_ptr()) },
+      0
+    );
+    assert_eq!(
+      unsafe { muse_presentation_publish_mount_roots(std::ptr::null()) },
+      0
+    );
+    assert!(
+      muse_mount_root_catalog_available(),
+      "a refused document must not uninstall the catalog the Host is using"
+    );
+    clear_muse_mount_root_catalog();
   }
 
   #[test]

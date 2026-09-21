@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:appflowy/plugins/dsh_agent/dsh_runtime.dart';
+import 'package:appflowy/plugins/resource_surface/muse_presentation_channel.dart';
 import 'package:appflowy/workspace_platform/domain/workspace_models.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/protobuf.dart';
 import 'package:flutter/foundation.dart';
@@ -31,6 +32,13 @@ class DshWorkspaceBridge {
   /// Host storage root override for tests.
   @visibleForTesting
   static String? stateRootOverride;
+
+  /// Push of the granted Mount directories into the Rust core, so a **partial**
+  /// Mount-relative path can be resolved inside its Mount instead of failing.
+  /// Overridable in tests, like the path overrides above.
+  @visibleForTesting
+  static bool Function(Map<String, String> roots) publishMountRoots =
+      publishMuseMountRoots;
 
   static String get _dshHome =>
       dshHomeOverride ?? DshRuntimeLayout.defaultDshHome;
@@ -205,6 +213,12 @@ class DshWorkspaceBridge {
           if (entry.value is String) entry.key: entry.value as String,
         ...await _receiptIds(),
       };
+      // The Host core cannot search a Mount it does not know, so the granted
+      // directories travel to the Rust provider alongside the DSH locator files.
+      // Publishing an empty catalog is deliberate: it retires directories of
+      // Mounts this Host no longer grants, and it runs even when the binding
+      // document itself carries no Mount.
+      publishMountRoots(locators);
       if (locators.isNotEmpty) await _writeLocators(locators, sweepLocators);
       final document = <String, Object?>{
         'protocol': protocol,

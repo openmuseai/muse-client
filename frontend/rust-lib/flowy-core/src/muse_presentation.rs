@@ -58,6 +58,30 @@
 //! the Host's live AppFlowy workspace; the DSH `mountRef` is opaque here, and
 //! the Flutter seam owns the mount-to-directory catalog.
 //!
+//! # Partial paths
+//!
+//! DSH cites what a reader sees, and a citation can be incomplete
+//! (`architecture/08-view-support.md`) or be nothing but a file name
+//! (`08-view-support.md`). The locator still mints the ref for exactly what DSH
+//! sent — the ref stays opaque and stable, and the anchor hint keeps naming the
+//! same locator — but the **dispatch** carries the path the Host resolved inside
+//! the Mount, because the surface only opens files that exist.
+//!
+//! Resolution therefore happens at presentation time, in this order:
+//!
+//! 1. the entry's Mount-relative path, exactly as minted, when it is a file;
+//! 2. a segment-suffix match, then a file-name match, inside the granted Mount —
+//!    see [`crate::muse_partial_path`] for the ranking, the bounds and the
+//!    containment rules;
+//! 3. nothing found: the minted path is dispatched unchanged, so the surface
+//!    answers its own `RESOURCE_NOT_FOUND`.
+//!
+//! When several files match equally well the request fails closed with a
+//! `failed` receipt whose `errorCode` is `RESOURCE_AMBIGUOUS_<count>`, and no
+//! surface is opened. Searching needs the directory each `mountRef` was granted
+//! ([`MuseMountRootCatalog`]); without one the Host forwards the minted path
+//! verbatim, which is what every build did before the catalog existed.
+//!
 //! # Terminal outcome
 //!
 //! Every invocation returns a terminal `muse.presentation/receipt/v2`; the
@@ -71,7 +95,9 @@
 //!   this Host build has no surface dispatcher installed yet;
 //! - `RESOURCE_NOT_FOUND` (`unsupported`, not retryable) — the opaque ref names
 //!   nothing this Host can present;
-//! - `RESOURCE_REF_INVALID` / `MOUNT_NOT_BOUND` / `VIEW_LOCKED` (`denied`).
+//! - `RESOURCE_REF_INVALID` / `MOUNT_NOT_BOUND` / `VIEW_LOCKED` (`denied`);
+//! - `RESOURCE_AMBIGUOUS_<count>` (`failed`, not retryable) — the minted path is
+//!   partial and several files inside the Mount match it equally well.
 //!
 //! # Remaining seam (Dart side)
 //!
@@ -114,6 +140,7 @@
 
 use std::{
   collections::BTreeMap,
+  path::PathBuf,
   sync::{Arc, RwLock, Weak},
   time::{SystemTime, UNIX_EPOCH},
 };
@@ -133,6 +160,8 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use uuid::Uuid;
+
+use crate::muse_partial_path::{PartialPathResolution, resolve_partial_path};
 
 /// Capability family id served by this module.
 pub const RESOURCE_PRESENTATION_FAMILY: &str = "muse.resource-presentation";
@@ -379,6 +408,121 @@ fn dispatch_surface(request: MusePresentationDispatch) -> Option<MusePresentatio
 }
 
 // ---------------------------------------------------------------------------
+// Granted Mount catalog
+// ---------------------------------------------------------------------------
+
+/// The directory the Host granted for one DSH `mountRef`.
+///
+/// A `mountRef` is opaque to this crate: the Flutter layer owns the
+/// mount-to-directory catalog (`MuseWorkspaceController`), so resolving a
+/// partial Mount-relative path needs that catalog here. Installing one turns on
+/// fuzzy resolution; without one the Host keeps dispatching the locator path
+/// exactly as DSH supplied it, which is the behaviour of every build that never
+/// published a catalog.
+pub trait MuseMountRootCatalog: Send + Sync + 'static {
+  /// Directory this Host granted for `mount_ref`, or `None` when unbound.
+  fn mount_root(&self, mount_ref: &str) -> Option<PathBuf>;
+}
+
+static MOUNT_ROOT_CATALOG: RwLock<Option<Arc<dyn MuseMountRootCatalog>>> = RwLock::new(None);
+
+/// Install (or replace) the granted Mount catalog.
+pub fn install_muse_mount_root_catalog(catalog: Arc<dyn MuseMountRootCatalog>) {
+  *MOUNT_ROOT_CATALOG
+    .write()
+    .expect("Muse Mount root catalog lock poisoned") = Some(catalog);
+}
+
+/// Remove the granted Mount catalog; partial paths stop being searched.
+pub fn clear_muse_mount_root_catalog() {
+  *MOUNT_ROOT_CATALOG
+    .write()
+    .expect("Muse Mount root catalog lock poisoned") = None;
+}
+
+/// True when this Host knows the granted directories of its Mounts.
+pub fn muse_mount_root_catalog_available() -> bool {
+  MOUNT_ROOT_CATALOG
+    .read()
+    .map(|slot| slot.is_some())
+    .unwrap_or(false)
+}
+
+fn mount_root_for(mount_ref: &str) -> Option<PathBuf> {
+  MOUNT_ROOT_CATALOG
+    .read()
+    .ok()
+    .and_then(|slot| slot.as_ref().cloned())?
+    .mount_root(mount_ref)
+}
+
+/// Equally good candidates for one partial path: the Host must refuse instead of
+/// guessing which file the caller meant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AmbiguousPartialPath {
+  candidates: usize,
+  sample: Vec<String>,
+  truncated: bool,
+}
+
+/// The Mount-relative path a presentation must actually dispatch.
+///
+/// The exact path always wins and is returned unchanged. Only when the granted
+/// Mount directory is known and the exact path is not a file does the Host search
+/// inside that Mount — see [`crate::muse_partial_path`] for the matching order,
+/// the ranking, the bounds and the containment rules. Nothing found (or a Mount
+/// whose directory this build does not know) keeps the supplied path, so the
+/// surface still answers its own honest not-found.
+fn mount_relative_path_for_dispatch(
+  entry: &LocatorEntry,
+) -> Result<String, AmbiguousPartialPath> {
+  if entry.relative_path.is_empty() {
+    // The Mount root itself: there is nothing to search for.
+    return Ok(entry.relative_path.clone());
+  }
+  let Some(root) = mount_root_for(&entry.mount_ref) else {
+    return Ok(entry.relative_path.clone());
+  };
+  match resolve_partial_path(&root, &entry.relative_path) {
+    PartialPathResolution::Exact(resolved) => Ok(resolved),
+    PartialPathResolution::Resolved {
+      relative_path,
+      matched,
+      extra_segments,
+    } => {
+      tracing::info!(
+        mount_ref = %entry.mount_ref,
+        requested = %entry.relative_path,
+        resolved = %relative_path,
+        matched = ?matched,
+        extra_segments,
+        "Muse resolved a partial Mount-relative path"
+      );
+      Ok(relative_path)
+    }
+    PartialPathResolution::Ambiguous {
+      candidates,
+      sample,
+      truncated,
+    } => Err(AmbiguousPartialPath {
+      candidates,
+      sample,
+      truncated,
+    }),
+    PartialPathResolution::NotFound | PartialPathResolution::Unavailable => {
+      Ok(entry.relative_path.clone())
+    }
+  }
+}
+
+/// Distinct, readable reason code for one ambiguous partial path. It names the
+/// number of equally good candidates, and `_32`-style caps mean "at least this
+/// many" when the search hit its candidate bound.
+fn ambiguous_partial_path_code(ambiguous: &AmbiguousPartialPath) -> String {
+  format!("RESOURCE_AMBIGUOUS_{}", ambiguous.candidates.max(2))
+}
+
+// ---------------------------------------------------------------------------
 // Host catalog
 // ---------------------------------------------------------------------------
 
@@ -569,9 +713,40 @@ impl PresentationProvider {
       }
     }
 
-    let target = self
+    let resolution = self
       .resolve(&workspace_id, created_at, &context, &invocation, &input)
       .await?;
+    let target = match resolution {
+      ResolveOutcome::Target(target) => Some(target),
+      ResolveOutcome::Unresolved => None,
+      ResolveOutcome::Ambiguous {
+        candidates,
+        sample,
+        truncated,
+      } => {
+        // Fail closed and visibly: never guess between equally good files.
+        tracing::warn!(
+          resource_ref = %input.resource_ref,
+          candidates,
+          truncated,
+          sample = ?sample,
+          "Muse refused an ambiguous partial Mount-relative path"
+        );
+        let ambiguous = AmbiguousPartialPath {
+          candidates,
+          sample,
+          truncated,
+        };
+        return self
+          .record_terminal(
+            &context,
+            &invocation,
+            &input,
+            failure_receipt(&input, "failed", &ambiguous_partial_path_code(&ambiguous), false),
+          )
+          .await;
+      }
+    };
     let resolved = target.is_some();
     let (effective_mode, adapter_ref, revision, locked) = match &target {
       Some(target) => {
@@ -658,9 +833,9 @@ impl PresentationProvider {
     context: &ResolvedHostContext,
     invocation: &ProviderInvocation,
     input: &RequestInput,
-  ) -> Result<Option<ResolvedTarget>, ProviderFailure> {
+  ) -> Result<ResolveOutcome, ProviderFailure> {
     if input.resource_ref == workspace_id {
-      return Ok(Some(ResolvedTarget {
+      return Ok(ResolveOutcome::Target(ResolvedTarget {
         id: workspace_id.to_string(),
         title: input.resource_ref.clone(),
         layout: "workspace",
@@ -681,7 +856,7 @@ impl PresentationProvider {
       .into_iter()
       .find(|view| view.id == input.resource_ref)
     {
-      return Ok(Some(ResolvedTarget {
+      return Ok(ResolveOutcome::Target(ResolvedTarget {
         id: view.id,
         title: view.title,
         layout: view.layout,
@@ -692,23 +867,37 @@ impl PresentationProvider {
         relative_path: None,
       }));
     }
-    Ok(
-      self
-        .locator_target(workspace_id, context, invocation, input)
-        .await
-        .map(|entry| ResolvedTarget {
-          id: entry.resource_ref.clone(),
-          title: entry.display_name.clone(),
-          layout: "resource",
-          // A plain Mount entry has no AppFlowy layout; the Flutter seam picks
-          // the engine from the path extension, exactly as the file viewer does.
-          adapter_ref: ADAPTER_UNRESOLVED,
-          locked: false,
-          revision: entry.revision.clone(),
-          mount_ref: Some(entry.mount_ref.clone()),
-          relative_path: Some(entry.relative_path.clone()),
-        }),
-    )
+    let Some(entry) = self
+      .locator_target(workspace_id, context, invocation, input)
+      .await
+    else {
+      return Ok(ResolveOutcome::Unresolved);
+    };
+    // A partial path is resolved **before** the surface is asked to present it,
+    // so the dispatch carries the real, existing Mount-relative path while the
+    // opaque ref stays exactly the one DSH was given.
+    let relative_path = match mount_relative_path_for_dispatch(&entry) {
+      Ok(relative_path) => relative_path,
+      Err(ambiguous) => {
+        return Ok(ResolveOutcome::Ambiguous {
+          candidates: ambiguous.candidates,
+          sample: ambiguous.sample,
+          truncated: ambiguous.truncated,
+        })
+      }
+    };
+    Ok(ResolveOutcome::Target(ResolvedTarget {
+      id: entry.resource_ref.clone(),
+      title: display_name_for(&entry.mount_ref, &relative_path),
+      layout: "resource",
+      // A plain Mount entry has no AppFlowy layout; the Flutter seam picks
+      // the engine from the path extension, exactly as the file viewer does.
+      adapter_ref: ADAPTER_UNRESOLVED,
+      locked: false,
+      revision: entry.revision.clone(),
+      mount_ref: Some(entry.mount_ref.clone()),
+      relative_path: Some(relative_path),
+    }))
   }
 
   /// Find (or re-derive) the locator this ref was minted for.
@@ -1219,6 +1408,22 @@ struct ResolvedTarget {
   mount_ref: Option<String>,
   /// Mount-relative POSIX path inside that Mount, empty for the Mount root.
   relative_path: Option<String>,
+}
+
+/// What one presentation request resolved to.
+#[derive(Debug, Clone)]
+enum ResolveOutcome {
+  /// The ref names a Host target; present it.
+  Target(ResolvedTarget),
+  /// The ref names nothing this Host holds: the surface decides.
+  Unresolved,
+  /// The ref names a Mount-relative locator whose partial path matched several
+  /// equally good files: refuse instead of guessing.
+  Ambiguous {
+    candidates: usize,
+    sample: Vec<String>,
+    truncated: bool,
+  },
 }
 
 /// Parsed subset of the v2 presentation request the Host acts on. The registry
@@ -2809,6 +3014,311 @@ mod tests {
 
     locator_lease.dispose().await;
     presentation_lease.dispose().await;
+    clear_muse_resource_surface_dispatcher();
+  }
+
+  // -------------------------------------------------------------------------
+  // Partial (fuzzy) Mount-relative resolution
+  // -------------------------------------------------------------------------
+
+  /// The granted Mount catalog, in the shape the Flutter layer publishes.
+  struct TestMountRoots {
+    roots: BTreeMap<String, PathBuf>,
+  }
+
+  impl MuseMountRootCatalog for TestMountRoots {
+    fn mount_root(&self, mount_ref: &str) -> Option<PathBuf> {
+      self.roots.get(mount_ref).cloned()
+    }
+  }
+
+  /// A temporary Mount directory that removes itself when the test ends.
+  struct MountTree {
+    root: PathBuf,
+  }
+
+  impl MountTree {
+    fn with(name: &str, files: &[&str]) -> Self {
+      let root = std::env::temp_dir().join(format!("muse-presentation-{name}-{}", Uuid::new_v4()));
+      std::fs::create_dir_all(&root).expect("temp mount root");
+      let tree = Self { root };
+      for file in files {
+        let path = tree.dir(file);
+        std::fs::create_dir_all(path.parent().expect("parent")).expect("temp parent");
+        std::fs::write(&path, "x").expect("temp file");
+      }
+      tree
+    }
+
+    fn dir(&self, relative: &str) -> PathBuf {
+      let mut path = self.root.clone();
+      for segment in relative.split('/') {
+        path.push(segment);
+      }
+      path
+    }
+
+    /// Grant this directory as `mount_ref`, as the Flutter layer does.
+    fn grant(&self, mount_ref: &str) {
+      install_muse_mount_root_catalog(Arc::new(TestMountRoots {
+        roots: BTreeMap::from([(mount_ref.to_string(), self.root.clone())]),
+      }));
+      assert!(muse_mount_root_catalog_available());
+    }
+  }
+
+  impl Drop for MountTree {
+    fn drop(&mut self) {
+      let _ = std::fs::remove_dir_all(&self.root);
+    }
+  }
+
+  /// Present one minted ref and return the receipt, with a recording surface.
+  async fn present(
+    provider: &PresentationProvider,
+    request_ref: &str,
+    resource_ref: &str,
+    anchor: Option<Value>,
+  ) -> Value {
+    let mut payload = request_payload(request_ref, resource_ref, "view");
+    if let Some(anchor) = anchor {
+      payload["anchorHint"] = anchor;
+    }
+    let receipt = provider
+      .invoke(
+        invocation(RESOURCE_PRESENTATION_REQUEST, payload),
+        context(),
+        Cancellation::default(),
+      )
+      .await
+      .expect("a receipt is always returned");
+    validate(PresentationSchemaKind::Receipt, &receipt).expect("receipt must satisfy v2");
+    receipt
+  }
+
+  /// An exact path is never rewritten: the surface still receives exactly what
+  /// DSH minted the ref for.
+  #[tokio::test]
+  async fn an_exact_mount_path_reaches_the_surface_unchanged() {
+    let _guard = dispatcher_guard();
+    clear_muse_resource_surface_dispatcher();
+    clear_muse_mount_root_catalog();
+    let dispatcher = TestDispatcher::without_revision();
+    install_muse_resource_surface_dispatcher(dispatcher.clone());
+    let tree = MountTree::with(
+      "exact",
+      &["docs/architecture/08-view-support.md", "docs/architecture/07-lsp.md"],
+    );
+    tree.grant("mount.6f2a1c");
+
+    let state = PresentationState::new(catalog(vec![document_view("view.1", false)]));
+    let locator = LocatorProvider::with_state(state.clone());
+    let provider = PresentationProvider::with_state(state);
+    let located = locate(
+      &locator,
+      locator_input("mount.6f2a1c", "docs/architecture/08-view-support.md"),
+    )
+    .await
+    .expect("an exact mount path locates");
+    let resource_ref = located["resourceRef"].as_str().unwrap().to_string();
+
+    let receipt = present(&provider, "request.1", &resource_ref, None).await;
+    assert_eq!(receipt["result"], json!("opened"));
+    let seen = dispatcher.seen();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+      seen[0].relative_path.as_deref(),
+      Some("docs/architecture/08-view-support.md")
+    );
+    assert_eq!(seen[0].title.as_deref(), Some("08-view-support.md"));
+    clear_muse_mount_root_catalog();
+    clear_muse_resource_surface_dispatcher();
+  }
+
+  /// A partial path is resolved inside the granted Mount **before** the surface
+  /// is asked to present it, so the dispatch carries the real, existing path.
+  #[tokio::test]
+  async fn a_partial_mount_path_reaches_the_surface_resolved() {
+    let _guard = dispatcher_guard();
+    clear_muse_resource_surface_dispatcher();
+    clear_muse_mount_root_catalog();
+    let dispatcher = TestDispatcher::without_revision();
+    install_muse_resource_surface_dispatcher(dispatcher.clone());
+    let tree = MountTree::with(
+      "partial",
+      &[
+        "docs/architecture/08-view-support.md",
+        "docs/architecture/07-lsp.md",
+      ],
+    );
+    tree.grant("mount.6f2a1c");
+
+    let state = PresentationState::new(catalog(vec![]));
+    let locator = LocatorProvider::with_state(state.clone());
+    let provider = PresentationProvider::with_state(state);
+
+    // (a) missing leading segments
+    let located = locate(&locator, locator_input("mount.6f2a1c", "architecture/08-view-support.md"))
+      .await
+      .expect("a partial path still locates");
+    let resource_ref = located["resourceRef"].as_str().unwrap().to_string();
+    let receipt = present(&provider, "request.1", &resource_ref, None).await;
+    assert_eq!(receipt["result"], json!("opened"));
+    assert_eq!(
+      receipt["resourceRef"],
+      json!(resource_ref),
+      "the opaque ref the caller was given never changes"
+    );
+
+    // (b) a bare file name
+    let located = locate(&locator, locator_input("mount.6f2a1c", "08-view-support.md"))
+      .await
+      .expect("a bare file name still locates");
+    let bare_ref = located["resourceRef"].as_str().unwrap().to_string();
+    assert_ne!(bare_ref, resource_ref);
+    let receipt = present(&provider, "request.2", &bare_ref, None).await;
+    assert_eq!(receipt["result"], json!("opened"));
+
+    let seen = dispatcher.seen();
+    assert_eq!(seen.len(), 2);
+    for dispatch in &seen {
+      assert_eq!(
+        dispatch.relative_path.as_deref(),
+        Some("docs/architecture/08-view-support.md"),
+        "the surface receives the resolved, existing path"
+      );
+      assert_eq!(dispatch.mount_ref.as_deref(), Some("mount.6f2a1c"));
+      assert_eq!(dispatch.title.as_deref(), Some("08-view-support.md"));
+    }
+    clear_muse_mount_root_catalog();
+    clear_muse_resource_surface_dispatcher();
+  }
+
+  /// Equally good candidates are never guessed between: the request fails closed
+  /// with a distinct reason code that names the candidate count, and no surface
+  /// is opened.
+  #[tokio::test]
+  async fn an_ambiguous_mount_path_fails_closed_with_a_named_count() {
+    let _guard = dispatcher_guard();
+    clear_muse_resource_surface_dispatcher();
+    clear_muse_mount_root_catalog();
+    let dispatcher = TestDispatcher::opened();
+    install_muse_resource_surface_dispatcher(dispatcher.clone());
+    let tree = MountTree::with(
+      "ambiguous",
+      &[
+        "docs/architecture/08-view-support.md",
+        "docs/reference/08-view-support.md",
+        "notes/third/08-view-support.md",
+      ],
+    );
+    tree.grant("mount.6f2a1c");
+
+    let state = PresentationState::new(catalog(vec![]));
+    let locator = LocatorProvider::with_state(state.clone());
+    let provider = PresentationProvider::with_state(state);
+    let located = locate(&locator, locator_input("mount.6f2a1c", "08-view-support.md"))
+      .await
+      .expect("locating a partial path never resolves it");
+    let resource_ref = located["resourceRef"].as_str().unwrap().to_string();
+
+    let receipt = present(&provider, "request.1", &resource_ref, None).await;
+    assert_eq!(receipt["result"], json!("failed"));
+    assert_eq!(receipt["errorCode"], json!("RESOURCE_AMBIGUOUS_3"));
+    assert_eq!(receipt["retryable"], json!(false));
+    assert!(
+      receipt.get("resourceRef").is_none(),
+      "the v2 failure receipt carries a reason code, not resource identity"
+    );
+    assert!(
+      dispatcher.seen().is_empty(),
+      "an ambiguous path must never reach the surface"
+    );
+
+    // A path that matches nothing keeps today's behaviour: the supplied path is
+    // dispatched and the surface answers its own not-found.
+    let located = locate(&locator, locator_input("mount.6f2a1c", "not-in-this-mount.md"))
+      .await
+      .expect("locate");
+    let missing = located["resourceRef"].as_str().unwrap().to_string();
+    let receipt = present(&provider, "request.2", &missing, None).await;
+    assert_eq!(receipt["result"], json!("opened"));
+    assert_eq!(
+      dispatcher.seen()[0].relative_path.as_deref(),
+      Some("not-in-this-mount.md")
+    );
+    clear_muse_mount_root_catalog();
+    clear_muse_resource_surface_dispatcher();
+  }
+
+  /// The resolved path is what a later, anchor-rehydrated request dispatches too:
+  /// the *partial* path is what DSH mirrors into the anchor, and the Host resolves
+  /// it again, deterministically, to the same file.
+  #[tokio::test]
+  async fn a_fuzzy_resolved_ref_rehydrates_from_the_partial_anchor() {
+    let _guard = dispatcher_guard();
+    clear_muse_resource_surface_dispatcher();
+    clear_muse_mount_root_catalog();
+    let dispatcher = TestDispatcher::without_revision();
+    install_muse_resource_surface_dispatcher(dispatcher.clone());
+    let tree = MountTree::with("rehydrate", &["docs/architecture/08-view-support.md"]);
+    tree.grant("mount.6f2a1c");
+
+    let state = PresentationState::new(catalog(vec![]));
+    let locator = LocatorProvider::with_state(state.clone());
+    let provider = PresentationProvider::with_state(state.clone());
+    let located = locate(&locator, locator_input("mount.6f2a1c", "08-view-support.md"))
+      .await
+      .expect("locate");
+    let resource_ref = located["resourceRef"].as_str().unwrap().to_string();
+
+    // Expire the locator table: only the anchor hint is left.
+    state.locators.lock().await.by_ref.clear();
+    let receipt = present(
+      &provider,
+      "request.1",
+      &resource_ref,
+      Some(anchor_hint("mount.6f2a1c", "08-view-support.md")),
+    )
+    .await;
+    assert_eq!(receipt["result"], json!("opened"));
+    assert_eq!(receipt["resourceRef"], json!(resource_ref));
+    assert_eq!(
+      dispatcher.seen()[0].relative_path.as_deref(),
+      Some("docs/architecture/08-view-support.md")
+    );
+    clear_muse_mount_root_catalog();
+    clear_muse_resource_surface_dispatcher();
+  }
+
+  /// Without a granted Mount catalog this Host cannot search, so nothing about a
+  /// dispatch changes: the supplied path is forwarded verbatim.
+  #[tokio::test]
+  async fn without_a_granted_mount_catalog_a_partial_path_is_forwarded_verbatim() {
+    let _guard = dispatcher_guard();
+    clear_muse_resource_surface_dispatcher();
+    clear_muse_mount_root_catalog();
+    let dispatcher = TestDispatcher::without_revision();
+    install_muse_resource_surface_dispatcher(dispatcher.clone());
+    // The file exists inside a real directory, but this Host was never granted
+    // that Mount, so it has nothing to search.
+    let _tree = MountTree::with("unsearched", &["docs/architecture/08-view-support.md"]);
+
+    let state = PresentationState::new(catalog(vec![]));
+    let locator = LocatorProvider::with_state(state.clone());
+    let provider = PresentationProvider::with_state(state);
+    let located = locate(&locator, locator_input("mount.6f2a1c", "08-view-support.md"))
+      .await
+      .expect("locate");
+    let resource_ref = located["resourceRef"].as_str().unwrap().to_string();
+
+    let receipt = present(&provider, "request.1", &resource_ref, None).await;
+    assert_eq!(receipt["result"], json!("opened"));
+    assert_eq!(
+      dispatcher.seen()[0].relative_path.as_deref(),
+      Some("08-view-support.md"),
+      "an unsearchable Host must not rewrite the path"
+    );
     clear_muse_resource_surface_dispatcher();
   }
 }

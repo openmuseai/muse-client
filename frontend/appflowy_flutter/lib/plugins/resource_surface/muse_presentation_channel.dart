@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:isolate';
 
@@ -12,25 +13,39 @@ import 'package:flutter/foundation.dart';
 ///
 /// `install` is called once per app start with the native port the Host posts
 /// dispatches to; `complete` answers the dispatch `requestRef` waits on, with a
-/// `null` outcome when the surface must fail closed.
+/// `null` outcome when the surface must fail closed. `publishMountRoots` hands
+/// the Host's granted Mount directories to the Rust core, which is what lets it
+/// resolve a partial Mount-relative path by fuzzy matching.
 abstract interface class MusePresentationTransport {
+  /// True when this build can reach the Host core at all.
+  bool get available;
+
   /// True when the Host accepted `port` and installed a surface dispatcher.
   bool install(int port);
 
   /// True when the Host accepted the answer for `requestRef`.
   bool complete(String requestRef, String? outcomeJson);
+
+  /// True when the Host accepted the granted Mount catalog.
+  bool publishMountRoots(String rootsJson);
 }
 
 /// `dart:ffi` transport over the hand-written exports of `dart_ffi.dll`.
 ///
 /// The bindings are looked up lazily and once: a build that predates the
 /// exports (or a test host without the library) simply reports "unavailable"
-/// instead of failing app start.
+/// instead of failing app start. The miss is remembered too, so an unavailable
+/// library is reported once per process rather than once per call.
 final class MusePresentationNativeTransport
     implements MusePresentationTransport {
   _MusePresentationNativeBindings? _bindings;
+  bool _unavailable = false;
+
+  @override
+  bool get available => _load() != null;
 
   _MusePresentationNativeBindings? _load() {
+    if (_unavailable) return null;
     final cached = _bindings;
     if (cached != null) return cached;
     try {
@@ -42,10 +57,15 @@ final class MusePresentationNativeTransport
         complete: library.lookupFunction<_CompleteNative, _CompleteDart>(
           'muse_presentation_complete_dispatch',
         ),
+        publishMountRoots:
+            library.lookupFunction<_PublishMountRootsNative, _PublishMountRootsDart>(
+          'muse_presentation_publish_mount_roots',
+        ),
       );
       _bindings = bindings;
       return bindings;
     } on Object catch (error) {
+      _unavailable = true;
       Log.warn('Muse presentation FFI is unavailable: $error');
       return null;
     }
@@ -80,6 +100,21 @@ final class MusePresentationNativeTransport
       if (outcomePtr != nullptr) malloc.free(outcomePtr);
     }
   }
+
+  @override
+  bool publishMountRoots(String rootsJson) {
+    final bindings = _load();
+    if (bindings == null) return false;
+    final rootsPtr = rootsJson.toNativeUtf8();
+    try {
+      return bindings.publishMountRoots(rootsPtr) != 0;
+    } on Object catch (error) {
+      Log.warn('Muse presentation Mount catalog failed: $error');
+      return false;
+    } finally {
+      malloc.free(rootsPtr);
+    }
+  }
 }
 
 typedef _InstallNative = Int32 Function(Int64 port);
@@ -92,15 +127,19 @@ typedef _CompleteDart = int Function(
   Pointer<Utf8> requestRef,
   Pointer<Utf8> outcomeJson,
 );
+typedef _PublishMountRootsNative = Int32 Function(Pointer<Utf8> rootsJson);
+typedef _PublishMountRootsDart = int Function(Pointer<Utf8> rootsJson);
 
 final class _MusePresentationNativeBindings {
   const _MusePresentationNativeBindings({
     required this.install,
     required this.complete,
+    required this.publishMountRoots,
   });
 
   final _InstallDart install;
   final _CompleteDart complete;
+  final _PublishMountRootsDart publishMountRoots;
 }
 
 /// Owns the Host→Flutter dispatch port of the running app.
@@ -138,6 +177,34 @@ final class MusePresentationChannelHost {
   /// Port the Host posts dispatches to, once installed.
   @visibleForTesting
   RawReceivePort? get port => _port;
+
+  /// Publishes the directories this Host granted for its Mounts.
+  ///
+  /// The Rust core treats a `mountRef` as opaque, so it can only resolve a
+  /// **partial** Mount-relative path by fuzzy matching once it knows the
+  /// directory each Mount was granted. An empty map is a valid, meaningful
+  /// catalog: it says this Host currently grants no searchable Mount, which is
+  /// exactly what the core needs to hear when the last Mount is unbound.
+  ///
+  /// Returns true when the core accepted the catalog. A build whose
+  /// `dart_ffi.dll` predates the export reports false without a warning: there
+  /// is nothing to publish, and the Host keeps forwarding locator paths
+  /// verbatim.
+  bool publishMountRoots(Map<String, String> roots) {
+    final usable = <String, String>{
+      for (final entry in roots.entries)
+        if (entry.key.isNotEmpty && entry.value.trim().isNotEmpty)
+          entry.key: entry.value,
+    };
+    if (!_transport.available) return false;
+    if (!_transport.publishMountRoots(jsonEncode(usable))) {
+      _onRefused(
+        'muse presentation could not publish the granted Mount catalog',
+      );
+      return false;
+    }
+    return true;
+  }
 
   /// Installs the Host dispatch channel exactly once and keeps it for the
   /// lifetime of the app.
@@ -198,3 +265,12 @@ final class MusePresentationChannelHost {
     return requestRef is String && requestRef.isNotEmpty ? requestRef : null;
   }
 }
+
+/// Publishes the Host's granted Mount directories through the app's one
+/// presentation channel, so the Rust core can resolve a partial Mount-relative
+/// path (`muse_partial_path`) instead of forwarding a path that does not exist.
+///
+/// Called by `DshWorkspaceBridge` whenever it publishes the binding, because
+/// that is the moment the Host decides which directories it grants.
+bool publishMuseMountRoots(Map<String, String> roots) =>
+    MusePresentationChannelHost.instance.publishMountRoots(roots);
