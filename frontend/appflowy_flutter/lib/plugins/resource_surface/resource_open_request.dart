@@ -1,5 +1,10 @@
 import 'dart:io';
 
+import 'package:appflowy/core/performance/muse_performance_trace.dart';
+import 'package:appflowy/plugins/resource_surface/engine_registry.dart';
+import 'package:appflowy/plugins/resource_surface/engines/register.dart';
+import 'package:appflowy/plugins/resource_surface/resource_open_defaults.dart';
+import 'package:appflowy/startup/startup.dart';
 import 'package:path/path.dart' as p;
 
 enum MuseResourceOpenOrigin { hostPicker, dshConversation }
@@ -12,12 +17,23 @@ final class MuseResourceOpenRequest {
     required this.origin,
     this.sessionCwd,
     this.line,
+    this.performanceTrace,
   });
 
   final String path;
   final MuseResourceOpenOrigin origin;
   final String? sessionCwd;
   final int? line;
+  final MusePerformanceTrace? performanceTrace;
+
+  MuseResourceOpenRequest withPerformanceTrace(MusePerformanceTrace trace) =>
+      MuseResourceOpenRequest(
+        path: path,
+        origin: origin,
+        sessionCwd: sessionCwd,
+        line: line,
+        performanceTrace: trace,
+      );
 }
 
 final class MuseResolvedResource {
@@ -26,99 +42,36 @@ final class MuseResolvedResource {
     required this.engine,
     required this.origin,
     this.line,
+    this.performanceTrace,
   });
 
   final File file;
   final MuseLocalEngine engine;
   final MuseResourceOpenOrigin origin;
   final int? line;
+  final MusePerformanceTrace? performanceTrace;
 }
 
 final class MuseLocalResourceRouter {
-  static const helixExtensions = <String>{
-    'c',
-    'cc',
-    'cpp',
-    'cs',
-    'css',
-    'dart',
-    'diff',
-    'go',
-    'h',
-    'hpp',
-    'ini',
-    'java',
-    'js',
-    'json',
-    'jsx',
-    'kt',
-    'log',
-    'lua',
-    'md',
-    'mjs',
-    'py',
-    'rb',
-    'rs',
-    'scss',
-    'sh',
-    'sql',
-    'swift',
-    'toml',
-    'ts',
-    'tsx',
-    'txt',
-    'xml',
-    'yaml',
-    'yml',
-    'zsh',
-  };
+  MuseLocalResourceRouter({
+    MuseResourceEngineRegistry? engines,
+    MuseResourceOpenDefaults? defaults,
+  })  : engines =
+            engines ?? _registeredEngines() ?? builtinResourceEngineRegistry(),
+        defaults = defaults ?? _registeredDefaults();
 
-  static const viewerExtensions = <String>{
-    '3gp',
-    'aac',
-    'aiff',
-    'avif',
-    'avi',
-    'bmp',
-    'csv',
-    'doc',
-    'docm',
-    'epub',
-    'flac',
-    'gif',
-    'htm',
-    'html',
-    'ico',
-    'jpeg',
-    'jpg',
-    'm4a',
-    'm4v',
-    'mkv',
-    'mov',
-    'mp3',
-    'mp4',
-    'odp',
-    'ods',
-    'odt',
-    'ogg',
-    'pdf',
-    'png',
-    'ppt',
-    'pptx',
-    'rtf',
-    'svg',
-    'tif',
-    'tiff',
-    'tsv',
-    'url',
-    'wav',
-    'webp',
-    'webm',
-    'xls',
-    'xlsx',
-    'xps',
-    'zip',
-  };
+  final MuseResourceEngineRegistry engines;
+  final MuseResourceOpenDefaults? defaults;
+
+  static MuseResourceEngineRegistry? _registeredEngines() {
+    if (!getIt.isRegistered<MuseResourceEngineRegistry>()) return null;
+    return getIt<MuseResourceEngineRegistry>();
+  }
+
+  static MuseResourceOpenDefaults? _registeredDefaults() {
+    if (!getIt.isRegistered<MuseResourceOpenDefaults>()) return null;
+    return getIt<MuseResourceOpenDefaults>();
+  }
 
   Future<MuseResolvedResource> resolve(MuseResourceOpenRequest request) async {
     if (request.path.trim().isEmpty) {
@@ -153,20 +106,20 @@ final class MuseLocalResourceRouter {
         throw const MuseResourceOpenException('OUTSIDE_SESSION_WORKSPACE');
       }
     }
-    final extension =
-        p.extension(canonical.path).toLowerCase().replaceFirst('.', '');
-    final engine = extension == 'docx'
-        ? MuseLocalEngine.ioffice
-        : viewerExtensions.contains(extension)
-            ? MuseLocalEngine.openFileViewer
-            : helixExtensions.contains(extension)
-                ? MuseLocalEngine.helix
-                : MuseLocalEngine.openFileViewer;
+    final extension = MuseResourceEngineRegistry.extensionOf(canonical.path);
+    if (defaults != null) {
+      await defaults!.ensureLoaded();
+    }
+    final engine = engines.resolve(
+      canonical.path,
+      preferred: defaults?.engineFor(extension),
+    );
     return MuseResolvedResource(
       file: canonical,
       engine: engine,
       origin: request.origin,
       line: request.line,
+      performanceTrace: request.performanceTrace,
     );
   }
 }

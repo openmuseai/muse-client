@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:appflowy/generated/flowy_svgs.g.dart';
+import 'package:appflowy/plugins/resource_surface/engines/helix.dart';
 import 'package:appflowy/plugins/resource_surface/resource_open_request.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_action_registry.dart';
 import 'package:appflowy/plugins/resource_surface/surfaces/helix_resource_surface.dart';
@@ -135,11 +136,13 @@ final class MuseResourcePluginWidgetBuilder extends PluginWidgetBuilder
                 key: ValueKey('helix:${plugin.resource.file.path}'),
                 file: plugin.resource.file,
                 initialLine: plugin.resource.line,
+                performanceTrace: plugin.resource.performanceTrace,
               ),
             MuseLocalEngine.openFileViewer => OpenFileViewerResourceSurface(
                 key: ValueKey('viewer:${plugin.resource.file.path}'),
                 file: plugin.resource.file,
                 initialLine: plugin.resource.line,
+                performanceTrace: plugin.resource.performanceTrace,
               ),
           },
         );
@@ -167,10 +170,7 @@ class _ResourceTitle extends StatelessWidget {
         children: [
           Icon(_iconFor(extension), size: 16),
           const SizedBox(width: 7),
-          if (constraints.hasBoundedWidth)
-            Flexible(child: label)
-          else
-            label,
+          if (constraints.hasBoundedWidth) Flexible(child: label) else label,
         ],
       ),
     );
@@ -191,8 +191,7 @@ class _ResourceTitle extends StatelessWidget {
     if ({'.mp4', '.mov', '.webm', '.mkv'}.contains(extension)) {
       return Icons.video_file_outlined;
     }
-    if (MuseLocalResourceRouter.helixExtensions
-        .contains(extension.replaceFirst('.', ''))) {
+    if (helixSupportedExtensions.contains(extension.replaceFirst('.', ''))) {
       return Icons.code;
     }
     return Icons.insert_drive_file_outlined;

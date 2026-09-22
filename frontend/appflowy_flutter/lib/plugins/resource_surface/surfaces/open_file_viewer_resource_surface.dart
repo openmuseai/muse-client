@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:appflowy/core/performance/muse_performance_trace.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
@@ -36,10 +37,12 @@ class OpenFileViewerResourceSurface extends StatefulWidget {
     super.key,
     required this.file,
     this.initialLine,
+    this.performanceTrace,
   });
 
   final File file;
   final int? initialLine;
+  final MusePerformanceTrace? performanceTrace;
 
   @override
   State<OpenFileViewerResourceSurface> createState() =>
@@ -58,6 +61,7 @@ class _OpenFileViewerResourceSurfaceState
   StreamSubscription<LoadingState>? _windowsLoading;
   var _windowsSent = false;
   var _disposed = false;
+  var _firstFrameScheduled = false;
 
   @override
   void initState() {
@@ -92,6 +96,7 @@ class _OpenFileViewerResourceSurfaceState
         'assets/engines/open-file-viewer/index.html',
       );
     } on Object catch (error) {
+      widget.performanceTrace?.fail(error);
       if (mounted) {
         setState(() => _error = 'Viewer runtime unavailable: $error');
       }
@@ -132,6 +137,7 @@ class _OpenFileViewerResourceSurfaceState
       setState(() => _windowsController = controller);
       await controller.loadUrl('https://$_windowsViewerHost/index.html');
     } on Object catch (error) {
+      widget.performanceTrace?.fail(error);
       if (mounted) {
         setState(() => _error = 'Viewer runtime unavailable: $error');
       }
@@ -143,10 +149,26 @@ class _OpenFileViewerResourceSurfaceState
     if (decoded is! Map) return;
     if (decoded['type'] == 'viewer.ready' && mounted) {
       setState(() => _loaded = true);
+      _finishFirstInteractiveFrame();
     }
     if (decoded['type'] == 'viewer.error' && mounted) {
+      widget.performanceTrace?.fail('${decoded['message']}');
       setState(() => _error = '${decoded['message']}');
     }
+  }
+
+  void _finishFirstInteractiveFrame() {
+    final trace = widget.performanceTrace;
+    if (trace == null || trace.isFinished || _firstFrameScheduled) return;
+    _firstFrameScheduled = true;
+    final span = trace.startSpan(
+      'engine.first-interactive-frame',
+      category: 'engine',
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      span.end();
+      trace.finish();
+    });
   }
 
   Future<String> _payload() async {
@@ -155,6 +177,8 @@ class _OpenFileViewerResourceSurfaceState
       'mime': lookupMimeType(widget.file.path) ?? 'application/octet-stream',
       'base64': base64Encode(await widget.file.readAsBytes()),
       if (widget.initialLine != null) 'line': widget.initialLine,
+      if (widget.performanceTrace != null)
+        'requestId': widget.performanceTrace!.traceId,
     });
   }
 
@@ -167,8 +191,12 @@ class _OpenFileViewerResourceSurfaceState
         throw StateError('RESOURCE_TOO_LARGE (64 MiB desktop bridge limit)');
       }
       final payload = await _payload();
-      await controller.runJavaScript('window.MuseViewer.open($payload)');
+      // WKWebView cannot bridge a JavaScript Promise back through
+      // evaluateJavaScript. Explicitly discard the async open() result; viewer
+      // readiness and errors are reported through MuseViewerBridge instead.
+      await controller.runJavaScript('void window.MuseViewer.open($payload)');
     } on Object catch (error) {
+      widget.performanceTrace?.fail(error);
       if (mounted) setState(() => _error = 'Unable to render resource: $error');
     }
   }
@@ -184,6 +212,7 @@ class _OpenFileViewerResourceSurfaceState
       }
       await controller.postWebMessage(await _payload());
     } on Object catch (error) {
+      widget.performanceTrace?.fail(error);
       if (mounted) setState(() => _error = 'Unable to render resource: $error');
     }
   }

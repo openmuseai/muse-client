@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:appflowy/plugins/resource_surface/engines/ioffice.dart';
 import 'package:appflowy/plugins/word/word_blob_store.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -29,7 +30,9 @@ class _IofficeWordResourceSurfaceState
   }
 
   Future<void> _open() async {
-    if (p.extension(widget.file.path).toLowerCase() != '.docx') {
+    final extension =
+        p.extension(widget.file.path).toLowerCase().replaceFirst('.', '');
+    if (!iofficeSupportedExtensions.contains(extension)) {
       _finish('iOffice Word accepts .docx resources in this release.');
       return;
     }

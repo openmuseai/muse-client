@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:appflowy/plugins/resource_surface/resource_file_plugin.dart';
-import 'package:appflowy/plugins/resource_surface/resource_open_request.dart';
+import 'package:appflowy/plugins/resource_surface/resource_open_with_menu.dart';
 import 'package:appflowy/plugins/resource_surface/resource_surface_session.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_action_registry.dart';
 import 'package:appflowy/plugins/version_diff/application/text_version_diff_service.dart';
@@ -27,41 +27,32 @@ void registerDefaultMuseResourceTabActions(
   registry
     ..register(
       MuseResourceTabAction(
-        id: 'muse.ioffice.open-with',
-        label: '使用 iOffice 打开',
-        icon: Icons.description_outlined,
+        id: 'muse.open-with',
+        label: '打开方式',
+        icon: Icons.open_with,
         group: 10,
         order: 10,
-        enabled: (target) =>
-            p.extension(target.resource.file.path).toLowerCase() == '.docx',
-        handler: (_, target) => target.selectEngine(MuseLocalEngine.ioffice),
-      ),
-    )
-    ..register(
-      MuseResourceTabAction(
-        id: 'muse.helix.open-with',
-        label: '使用 Helix 打开',
-        icon: Icons.code,
-        group: 10,
-        order: 20,
-        enabled: (target) => MuseLocalResourceRouter.helixExtensions.contains(
-          p
-              .extension(target.resource.file.path)
-              .toLowerCase()
-              .replaceFirst('.', ''),
+        submenuBuilder: (context, target, closeMenu) =>
+            MuseResourceOpenWithMenu(
+          target: target,
+          closeMenu: closeMenu,
         ),
-        handler: (_, target) => target.selectEngine(MuseLocalEngine.helix),
-      ),
-    )
-    ..register(
-      MuseResourceTabAction(
-        id: 'muse.open-file-viewer.open-with',
-        label: '使用 Open File Viewer 打开',
-        icon: Icons.visibility_outlined,
-        group: 10,
-        order: 30,
-        handler: (_, target) =>
-            target.selectEngine(MuseLocalEngine.openFileViewer),
+        handler: (context, target) async {
+          if (target is MuseResourceFilePlugin) return;
+          if (!context.mounted) return;
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => Dialog(
+              child: SizedBox(
+                width: 280,
+                child: MuseResourceOpenWithMenu(
+                  target: target,
+                  closeMenu: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     )
     ..register(

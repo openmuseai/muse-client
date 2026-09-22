@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:appflowy/core/performance/muse_performance_trace.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_commands.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_install.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_settings.dart';
-import 'package:appflowy/plugins/resource_surface/helix/helix_warm_pool.dart';
 import 'package:appflowy/plugins/resource_surface/resource_surface_session.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:flutter/gestures.dart';
@@ -20,10 +20,12 @@ class HelixResourceSurface extends StatefulWidget {
     super.key,
     required this.file,
     this.initialLine,
+    this.performanceTrace,
   });
 
   final File file;
   final int? initialLine;
+  final MusePerformanceTrace? performanceTrace;
 
   @override
   State<HelixResourceSurface> createState() => _HelixResourceSurfaceState();
@@ -36,20 +38,15 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
   StreamSubscription<Uint8List>? _output;
   Directory? _configRoot;
   bool _booted = false;
+
   /// Helix paints its first frame only after the process has started, so the
   /// pane stays covered by the loading indicator until the PTY reports output.
   bool _painted = false;
-  /// When true, the next PTY output lifts the loading cover. It is armed at
-  /// spawn for cold starts and after `:open` for adopted warm processes, so a
-  /// warm process's dashboard is replayed without ever being shown.
-  bool _revealRequested = false;
+  bool _firstFrameScheduled = false;
   Timer? _paintTimeout;
-  /// Watches an adopted warm process until it really shows the document.
-  Timer? _openWatch;
   String? _error;
   HelixSettings _applied = HelixSettings.defaults;
   int _lspRevision = -1;
-  String? _bootMessage;
   final GlobalKey<TerminalViewState> _terminalViewKey =
       GlobalKey<TerminalViewState>();
   int _pointerDownButtons = 0;
@@ -86,37 +83,25 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
       await installer.ensureRoot();
       final xdgRuntime = installer.grammarRuntime;
       final runtimes = installer.grammarRuntimes(install.runtime);
-      var grammarCount = await copyHelixGrammars(
+      final grammarCount = await copyHelixGrammars(
         destRuntime: xdgRuntime,
         extraSearchRuntimes: [install.runtime],
       );
       final needed = helixGrammarNameForFile(widget.file.path);
       final missingHighlight = grammarCount == 0 ||
           (needed != null && !helixHasGrammar(needed, runtimes));
-      if (missingHighlight && installer.busyId == null) {
-        if (mounted) {
-          setState(() {
-            _bootMessage = needed == null
-                ? '正在编译语法高亮…'
-                : '正在编译 $needed 语法高亮（首次需要 git 与 C 编译器）…';
-          });
-        }
-        try {
-          await installer.buildGrammars(
-            hxBinary: install.binary,
-            helixRuntime: install.runtime,
-          );
-          grammarCount = helixGrammarLibraryCount(runtimes);
-        } on Object catch (error) {
-          _settingsController.setGrammarStatus('$error');
-        }
-      }
+      // Grammar downloads and C compilation must never block a file's first
+      // frame. Missing grammars remain an explicit Settings action; Helix can
+      // still open and edit the file without syntax highlighting.
       _settingsController.setGrammarStatus(
-        grammarCount > 0
-            ? '语法高亮已就绪（$grammarCount 个 tree-sitter grammars）'
-            : '未找到 grammars：打开 设置 → Plugin → 安装语法高亮',
+        missingHighlight
+            ? needed == null
+                ? '未找到 grammars：打开 设置 → Plugin → 安装语法高亮'
+                : '缺少 $needed grammar：打开 设置 → Plugin → 安装语法高亮'
+            : grammarCount > 0
+                ? '语法高亮已就绪（$grammarCount 个 tree-sitter grammars）'
+                : '未找到 grammars：打开 设置 → Plugin → 安装语法高亮',
       );
-      if (mounted) setState(() => _bootMessage = null);
       final configDir =
           await Directory.systemTemp.createTemp('muse-helix-config-');
       _configRoot = configDir;
@@ -153,28 +138,11 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
       environment['PATH'] = installer.pathPrefix(
         environment['PATH'] ?? '/usr/bin:/bin',
       );
-      // Prefer a process the pool already started: `:open` on a live Helix
-      // costs a fraction of Helix's per-file process start. Everything below is
-      // the unchanged cold path, used whenever the pool has nothing to offer.
-      HelixWarmSpec? warmSpec;
-      try {
-        warmSpec = await buildHelixWarmSpec(
-          installer: installer,
-          install: install,
-          settings: _applied,
-          workingDirectory: project.path,
-        );
-      } on Object {
-        warmSpec = null;
-      }
-      if (warmSpec != null) {
-        final warm = await HelixWarmPool.instance.take(warmSpec);
-        if (warm != null) {
-          _adoptWarmProcess(warm, warmSpec);
-          return;
-        }
-      }
-      final pty = Pty.start(
+      // Starting a fresh process is faster and more predictable than typing an
+      // absolute path through Helix's `:open` prompt. The latter recomputes
+      // path completion for every character and was 2-4x slower in real
+      // workspaces. Keep native PTY creation off the Flutter UI isolate.
+      final pty = await Pty.startAsync(
         install.binary,
         arguments: arguments,
         workingDirectory: project.path,
@@ -182,25 +150,26 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
         rows: 30,
         columns: 100,
       );
+      if (!mounted) {
+        pty.kill();
+        return;
+      }
       _pty = pty;
       _output = pty.output.listen(_onPtyData, onError: _onPtyError);
-      if (mounted) {
-        setState(() {});
-        _booted = true;
-        _revealRequested = true;
-        _armPaintTimeout();
-        _lspRevision = _settingsController.installer.revision;
-        WidgetsBinding.instance.addPostFrameCallback((_) => _syncPtySize());
-        unawaited(_enterInsertMode(pty));
-      }
-      if (warmSpec != null) HelixWarmPool.instance.schedule(warmSpec);
+      setState(() {});
+      _booted = true;
+      _armPaintTimeout();
+      _lspRevision = _settingsController.installer.revision;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncPtySize());
+      unawaited(_enterInsertMode(pty));
     } on Object catch (error) {
+      widget.performanceTrace?.fail(error);
       if (mounted) setState(() => _error = 'Helix runtime unavailable: $error');
     }
   }
 
   void _onPtyData(Uint8List data) {
-    if (_revealRequested && !_painted) {
+    if (!_painted) {
       _paintTimeout?.cancel();
       _paintTimeout = null;
       if (mounted) {
@@ -208,97 +177,36 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
       } else {
         _painted = true;
       }
+      _finishFirstInteractiveFrame();
     }
     _terminal.write(utf8.decode(data, allowMalformed: true));
   }
 
   void _onPtyError(Object error) {
+    widget.performanceTrace?.fail(error);
     if (mounted) setState(() => _error = 'Helix PTY error: $error');
+  }
+
+  void _finishFirstInteractiveFrame() {
+    final trace = widget.performanceTrace;
+    if (trace == null || trace.isFinished || _firstFrameScheduled) return;
+    _firstFrameScheduled = true;
+    final span = trace.startSpan(
+      'engine.first-interactive-frame',
+      category: 'engine',
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      span.end();
+      trace.finish();
+    });
   }
 
   /// Safety net: never leave the loading cover up if Helix stays silent.
   void _armPaintTimeout() {
     _paintTimeout?.cancel();
     _paintTimeout = Timer(const Duration(seconds: 8), () {
-      _openWatch?.cancel();
-      _openWatch = null;
       if (mounted && !_painted) setState(() => _painted = true);
     });
-  }
-
-  /// Turns a pre-started, file-less Helix process into this tab's editor: the
-  /// output it produced while idle is replayed into the local terminal model
-  /// (hidden behind the loading cover) and then `:open` shows the document.
-  void _adoptWarmProcess(HelixWarmProcess warm, HelixWarmSpec spec) {
-    final pty = warm.pty;
-    final buffered = warm.takeBufferedOutput();
-    if (buffered.isNotEmpty) {
-      _terminal.write(utf8.decode(buffered, allowMalformed: true));
-    }
-    if (!mounted) {
-      pty.kill();
-      HelixWarmPool.instance.schedule(spec);
-      return;
-    }
-    _pty = pty;
-    _output = warm.output.listen(_onPtyData, onError: _onPtyError);
-    setState(() {});
-    _booted = true;
-    // The cover is lifted by _watchWarmOpen once the document is really on
-    // screen; PTY output alone would also match the echoed command line.
-    _revealRequested = false;
-    _armPaintTimeout();
-    _lspRevision = _settingsController.installer.revision;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncPtySize());
-    pty.write(
-      helixOpenCommandBytes(widget.file.path, line: widget.initialLine),
-    );
-    // Refill the pool so the next document opens just as fast.
-    HelixWarmPool.instance.schedule(spec);
-    unawaited(_enterInsertMode(pty));
-    _watchWarmOpen(pty);
-  }
-
-  /// Waits until Helix's status line names [widget.file], then lifts the loading
-  /// cover. If the adopted process never switches buffers, the tab falls back to
-  /// a cold start so the pool's scratch buffer can never be shown to the user.
-  void _watchWarmOpen(Pty pty) {
-    const step = Duration(milliseconds: 60);
-    const deadline = Duration(milliseconds: 1000);
-    var elapsed = Duration.zero;
-    _openWatch?.cancel();
-    _openWatch = Timer.periodic(step, (timer) {
-      elapsed += step;
-      if (!mounted || _pty != pty) {
-        timer.cancel();
-        _openWatch = null;
-        return;
-      }
-      if (_terminalShowsOpenFile()) {
-        timer.cancel();
-        _openWatch = null;
-        setState(() => _painted = true);
-        return;
-      }
-      if (elapsed >= deadline) {
-        timer.cancel();
-        _openWatch = null;
-        unawaited(_reboot());
-      }
-    });
-  }
-
-  /// True once the name of [widget.file] appears in one of the bottom rows of
-  /// the terminal, where Helix prints the current document's status line.
-  bool _terminalShowsOpenFile() {
-    final name = p.basename(widget.file.path);
-    if (name.isEmpty) return true;
-    final lines = _terminal.buffer.lines;
-    final from = lines.length - 3 < 0 ? 0 : lines.length - 3;
-    for (var index = from; index < lines.length; index++) {
-      if (lines[index].getText().contains(name)) return true;
-    }
-    return false;
   }
 
   void _onSettingsChanged() {
@@ -314,23 +222,17 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
     _applied = next;
     if ((appearanceChanged || reboot) && mounted) setState(() {});
     if (reboot && _booted) {
-      // Idle processes were started with the previous settings; drop them so
-      // the rebooted surface cannot adopt a stale configuration.
-      HelixWarmPool.instance.invalidate();
       unawaited(_reboot());
     }
   }
 
   Future<void> _reboot() async {
     await _flushToOriginal();
-    _openWatch?.cancel();
-    _openWatch = null;
     _pty?.kill();
     await _output?.cancel();
     _pty = null;
     _booted = false;
     _painted = false;
-    _revealRequested = false;
     if (mounted) await _boot();
   }
 
@@ -461,7 +363,6 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
   void dispose() {
     _settingsController.removeListener(_onSettingsChanged);
     _paintTimeout?.cancel();
-    _openWatch?.cancel();
     MuseResourceSurfaceSession.instance.detach(widget.file);
     unawaited(_output?.cancel());
     final pty = _pty;
@@ -502,7 +403,7 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
               ),
               const SizedBox(height: 14),
               Text(
-                _bootMessage ?? '正在启动 Helix 编辑器…',
+                '正在启动 Helix 编辑器…',
                 textAlign: TextAlign.center,
               ),
             ],
@@ -514,87 +415,90 @@ class _HelixResourceSurfaceState extends State<HelixResourceSurface> {
     return Stack(
       children: [
         Column(
-      children: [
-        GestureDetector(
-          onSecondaryTapDown: (details) =>
-              unawaited(_showEditorContextMenu(details.globalPosition)),
-          child: Container(
-            height: 32,
-            color: const Color(0xFF20252E),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    settings.keymap == HelixKeymapPreset.vscode
-                        ? '⌘-点击转到定义 · 右键查找用法 · F12 定义 · ⇧F12 用法 · ⌥← 后退'
-                        : '右键打开导航菜单 · Ctrl+S 保存 · Esc 进入 Helix 命令模式',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                _NavButton(
-                  label: '定义',
-                  tooltip: '转到定义 (F12)',
-                  onPressed: () => _runNav(HelixNavCommand.gotoDefinition),
-                ),
-                _NavButton(
-                  label: '用法',
-                  tooltip: '查找用法 (Shift+F12)',
-                  onPressed: () => _runNav(HelixNavCommand.findUsages),
-                ),
-                _NavButton(
-                  label: '后退',
-                  tooltip: '返回上一位置 (Ctrl+O / Alt+←)',
-                  onPressed: () => _runNav(HelixNavCommand.jumpBack),
-                ),
-                _NavButton(
-                  label: '前进',
-                  tooltip: '前进到下一位置 (F6 / Alt+→)',
-                  onPressed: () => _runNav(HelixNavCommand.jumpForward),
-                ),
-                Builder(
-                  builder: (buttonContext) {
-                    return _NavButton(
-                      label: '⋯',
-                      tooltip: '更多导航操作',
-                      onPressed: () {
-                        final box =
-                            buttonContext.findRenderObject() as RenderBox?;
-                        final pos = box?.localToGlobal(
-                              Offset(0, box.size.height),
-                            ) ??
-                            Offset.zero;
-                        unawaited(_showEditorContextMenu(pos));
+          children: [
+            GestureDetector(
+              onSecondaryTapDown: (details) =>
+                  unawaited(_showEditorContextMenu(details.globalPosition)),
+              child: Container(
+                height: 32,
+                color: const Color(0xFF20252E),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        settings.keymap == HelixKeymapPreset.vscode
+                            ? '⌘-点击转到定义 · 右键查找用法 · F12 定义 · ⇧F12 用法 · ⌥← 后退'
+                            : '右键打开导航菜单 · Ctrl+S 保存 · Esc 进入 Helix 命令模式',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    _NavButton(
+                      label: '定义',
+                      tooltip: '转到定义 (F12)',
+                      onPressed: () => _runNav(HelixNavCommand.gotoDefinition),
+                    ),
+                    _NavButton(
+                      label: '用法',
+                      tooltip: '查找用法 (Shift+F12)',
+                      onPressed: () => _runNav(HelixNavCommand.findUsages),
+                    ),
+                    _NavButton(
+                      label: '后退',
+                      tooltip: '返回上一位置 (Ctrl+O / Alt+←)',
+                      onPressed: () => _runNav(HelixNavCommand.jumpBack),
+                    ),
+                    _NavButton(
+                      label: '前进',
+                      tooltip: '前进到下一位置 (F6 / Alt+→)',
+                      onPressed: () => _runNav(HelixNavCommand.jumpForward),
+                    ),
+                    Builder(
+                      builder: (buttonContext) {
+                        return _NavButton(
+                          label: '⋯',
+                          tooltip: '更多导航操作',
+                          onPressed: () {
+                            final box =
+                                buttonContext.findRenderObject() as RenderBox?;
+                            final pos = box?.localToGlobal(
+                                  Offset(0, box.size.height),
+                                ) ??
+                                Offset.zero;
+                            unawaited(_showEditorContextMenu(pos));
+                          },
+                        );
                       },
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          child: ColoredBox(
-            color: settings.backgroundColor,
-            child: SizedBox.expand(
-              child: Listener(
-                onPointerDown: _onPointerDown,
-                onPointerUp: _onPointerUp,
-                child: TerminalView(
-                  _terminal,
-                  key: _terminalViewKey,
-                  padding: EdgeInsets.zero,
-                  autofocus: true,
-                  theme: settings.terminalTheme,
-                  textStyle: settings.terminalStyle,
-                  onKeyEvent: _onTerminalKey,
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+            Expanded(
+              child: ColoredBox(
+                color: settings.backgroundColor,
+                child: SizedBox.expand(
+                  child: Listener(
+                    onPointerDown: _onPointerDown,
+                    onPointerUp: _onPointerUp,
+                    child: TerminalView(
+                      _terminal,
+                      key: _terminalViewKey,
+                      padding: EdgeInsets.zero,
+                      autofocus: true,
+                      theme: settings.terminalTheme,
+                      textStyle: settings.terminalStyle,
+                      onKeyEvent: _onTerminalKey,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         // The PTY exists before Helix has drawn anything, so cover the still
         // empty terminal until the first bytes arrive instead of showing a

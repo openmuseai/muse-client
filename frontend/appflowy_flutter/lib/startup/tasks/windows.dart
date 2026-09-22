@@ -5,9 +5,11 @@ import 'package:appflowy/brand/brand.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/startup/tasks/app_window_size_manager.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_sidecar.dart';
-import 'package:appflowy/plugins/resource_surface/helix/helix_warm_pool.dart';
+import 'package:appflowy/plugins/resource_surface/helix/helix_install.dart';
+import 'package:appflowy/plugins/resource_surface/viewer/open_file_viewer_runtime_broker.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_pty/flutter_pty.dart';
 import 'package:scaled_app/scaled_app.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:universal_platform/universal_platform.dart';
@@ -53,6 +55,19 @@ class InitAppWindowTask extends LaunchTask with WindowListener {
 
     final position = await windowSizeManager.getPosition();
 
+    // Warm the worker on every desktop platform. Helix surfaces use
+    // Pty.startAsync(), so the first user open should not pay isolate and FFI
+    // initialization latency.
+    unawaited(Pty.prewarmAsync());
+    unawaited(() async {
+      try {
+        await HelixInstall.resolve();
+      } on Object {
+        // Engine discovery remains retryable from the real open path. Startup
+        // prewarming must never prevent the Host window from appearing.
+      }
+    }());
+
     if (UniversalPlatform.isWindows) {
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
 
@@ -72,6 +87,7 @@ class InitAppWindowTask extends LaunchTask with WindowListener {
           appWindow.maximize();
         }
       });
+      unawaited(OpenFileViewerRuntimeBroker.instance.warmUp());
     } else {
       await windowManager.waitUntilReadyToShow(windowOptions, () async {
         await windowManager.show();
@@ -144,7 +160,7 @@ class InitAppWindowTask extends LaunchTask with WindowListener {
     if (getIt.isRegistered<DshSidecar>()) {
       unawaited(getIt<DshSidecar>().stop());
     }
-    HelixWarmPool.instance.dispose();
+    OpenFileViewerRuntimeBroker.instance.dispose();
   }
 
   @override
@@ -155,6 +171,6 @@ class InitAppWindowTask extends LaunchTask with WindowListener {
     if (getIt.isRegistered<DshSidecar>()) {
       await getIt<DshSidecar>().stop();
     }
-    HelixWarmPool.instance.dispose();
+    OpenFileViewerRuntimeBroker.instance.dispose();
   }
 }

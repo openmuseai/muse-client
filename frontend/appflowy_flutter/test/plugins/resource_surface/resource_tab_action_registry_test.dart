@@ -43,6 +43,22 @@ void main() {
     actions.first.invoke(_FakeBuildContext());
     expect(target.selectedEngine, MuseLocalEngine.helix);
   });
+
+  test('open-with is one cascading action, not one row per engine', () {
+    final registry = MuseResourceTabActionRegistry()
+      ..register(
+        MuseResourceTabAction(
+          id: 'muse.open-with',
+          label: '打开方式',
+          handler: (_, __) {},
+          submenuBuilder: (context, target, close) => const SizedBox.shrink(),
+        ),
+      );
+    final actions = registry.actionsFor(_Target());
+    expect(actions.single.id, 'muse.open-with');
+    expect(actions.single.label, '打开方式');
+    expect(actions.single.submenuBuilder, isNotNull);
+  });
 }
 
 final class _Target implements MuseResourceTabTarget {

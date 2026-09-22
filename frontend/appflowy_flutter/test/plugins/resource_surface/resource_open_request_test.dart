@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:appflowy/plugins/resource_surface/engines/register.dart';
 import 'package:appflowy/plugins/resource_surface/resource_open_request.dart';
 import 'package:flutter_test/flutter_test.dart';
 
