@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar_stack_layout.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
@@ -138,23 +140,34 @@ class _SidebarStackPanesState extends State<SidebarStackPanes> {
         );
         _syncExpanded(decision.expandedIds);
 
+        final maxHeight = constraints.maxHeight;
+        final n = widget.panes.length;
+        var leftover = maxHeight.isFinite
+            ? maxHeight - (n > 1 ? (n - 1) * widget.dividerHeight : 0)
+            : double.infinity;
+        if (decision.fillingId != null && leftover.isFinite) {
+          leftover -= widget.headerHeight + 4;
+        }
+
         return ClipRect(
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < widget.panes.length; i++) ...[
-              if (i > 0) ...[
-                const VSpace(8),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: FlowyDivider(),
-                ),
-                const VSpace(8),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < widget.panes.length; i++) ...[
+                if (i > 0) ...[
+                  const VSpace(8),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: FlowyDivider(),
+                  ),
+                  const VSpace(8),
+                ],
+                _buildPane(widget.panes[i], decision, leftover, (used) {
+                  leftover -= used;
+                }),
               ],
-              _buildPane(widget.panes[i], decision),
             ],
-          ],
-        ),
+          ),
         );
       },
     );
@@ -163,21 +176,31 @@ class _SidebarStackPanesState extends State<SidebarStackPanes> {
   Widget _buildPane(
     SidebarStackPane pane,
     SidebarStackLayoutDecision decision,
+    double leftover,
+    void Function(double used) consume,
   ) {
     final expanded = decision.expandedIds.contains(pane.id);
-    final fillRemaining = decision.fillingId == pane.id;
+    final filling = decision.fillingId == pane.id;
     final child = pane.builder(
       context,
       SidebarStackPaneSlot(
         expanded: expanded,
-        fillRemaining: fillRemaining,
+        fillRemaining: filling || expanded,
         onToggle: (next) => _toggle(pane.id, next),
         onContentHeight: (height) => _reportHeight(pane.id, height),
         onActivate: () => _activate(pane.id),
       ),
     );
-    if (fillRemaining) return Expanded(child: child);
-    return child;
+    if (filling) return Expanded(child: child);
+    if (!expanded) {
+      consume(widget.headerHeight);
+      return child;
+    }
+    final want = widget.headerHeight + 4 + (_bodyHeights[pane.id] ?? 0);
+    final cap = leftover.isFinite ? math.max(0.0, leftover) : want;
+    final height = math.min(want, cap);
+    consume(height);
+    return SizedBox(height: height, child: child);
   }
 }
 

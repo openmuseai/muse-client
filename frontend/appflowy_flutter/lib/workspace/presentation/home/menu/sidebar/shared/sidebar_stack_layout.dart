@@ -23,6 +23,7 @@ SidebarStackLayoutDecision resolveSidebarStackLayout({
   required double availableHeight,
   double headerHeight = 32,
   double dividerHeight = 17,
+  double sectionBodyGap = 4,
 }) {
   if (paneIds.isEmpty || !availableHeight.isFinite || availableHeight <= 0) {
     return SidebarStackLayoutDecision(
@@ -35,7 +36,8 @@ SidebarStackLayoutDecision resolveSidebarStackLayout({
       if (expandedIds.contains(id)) id,
   };
   final chrome = paneIds.length * headerHeight +
-      (paneIds.isEmpty ? 0 : (paneIds.length - 1) * dividerHeight);
+      (paneIds.isEmpty ? 0 : (paneIds.length - 1) * dividerHeight) +
+      expanded.length * sectionBodyGap;
   var content = 0.0;
   var unmeasured = false;
   for (final id in expanded) {
@@ -45,35 +47,34 @@ SidebarStackLayoutDecision resolveSidebarStackLayout({
     content += bodyHeights[id] ?? 0;
   }
 
-  if (!unmeasured && chrome + content <= availableHeight + 0.5) {
-    return SidebarStackLayoutDecision(expandedIds: expanded);
+  String? keepOf(Iterable<String> ids) {
+    if (ids.isEmpty) return null;
+    if (activeId != null && ids.contains(activeId)) return activeId;
+    if (unmeasured) return ids.first;
+    return ids.reduce(
+      (a, b) => (bodyHeights[a] ?? 0) >= (bodyHeights[b] ?? 0) ? a : b,
+    );
   }
 
   if (expanded.length <= 1) {
-    final keep = expanded.isEmpty ? null : expanded.first;
     return SidebarStackLayoutDecision(
       expandedIds: expanded,
+      fillingId: keepOf(expanded),
+    );
+  }
+
+  final keep = keepOf(expanded);
+  if (!unmeasured && chrome + content > availableHeight + 0.5) {
+    return SidebarStackLayoutDecision(
+      expandedIds: {keep!},
       fillingId: keep,
     );
   }
 
-  final keep = activeId != null && expanded.contains(activeId)
-      ? activeId
-      : unmeasured
-          ? expanded.first
-          : expanded.reduce(
-              (a, b) => (bodyHeights[a] ?? 0) >= (bodyHeights[b] ?? 0) ? a : b,
-            );
-
-  if (unmeasured) {
-    return SidebarStackLayoutDecision(
-      expandedIds: expanded,
-      fillingId: keep,
-    );
-  }
-
+  // Two expanded spaces: the active one always fills leftover height so a
+  // directory-tree expand/collapse cannot overflow the sidebar for a frame.
   return SidebarStackLayoutDecision(
-    expandedIds: {keep},
+    expandedIds: expanded,
     fillingId: keep,
   );
 }

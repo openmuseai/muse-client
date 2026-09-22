@@ -55,8 +55,6 @@ class HomeStack extends StatefulWidget {
 }
 
 class _HomeStackState extends State<HomeStack> with WindowListener {
-  int selectedIndex = 0;
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider<TabsBloc>.value(
@@ -70,47 +68,57 @@ class _HomeStackState extends State<HomeStack> with WindowListener {
               padding: EdgeInsets.only(left: widget.layout.menuSpacing),
               child: TabsManager(
                 onIndexChanged: (index) {
-                  if (selectedIndex != index) {
+                  if (state.currentIndex != index) {
                     // Unfocus editor to hide selection toolbar
                     FocusScope.of(context).unfocus();
 
                     context.read<TabsBloc>().add(TabsEvent.selectTab(index));
-                    setState(() => selectedIndex = index);
                   }
                 },
               ),
             ),
             Expanded(
               child: IndexedStack(
-                index: selectedIndex,
+                index: state.currentIndex,
                 children: state.pageManagers
+                    .asMap()
+                    .entries
                     .map(
-                      (pm) => LayoutBuilder(
-                        builder: (context, constraints) {
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  children: [
-                                    pm.stackTopBar(layout: widget.layout),
-                                    Expanded(
-                                      child: PageStack(
-                                        pageManager: pm,
-                                        delegate: widget.delegate,
-                                        userProfile: widget.userProfile,
+                      (entry) => KeyedSubtree(
+                        key: ValueKey(entry.value.plugin.id),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final pm = entry.value;
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      pm.stackTopBar(layout: widget.layout),
+                                      Expanded(
+                                        child: PageStack(
+                                          key: ValueKey(
+                                            'page:${pm.plugin.id}',
+                                          ),
+                                          pageManager: pm,
+                                          isActive:
+                                              entry.key == state.currentIndex,
+                                          delegate: widget.delegate,
+                                          userProfile: widget.userProfile,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              SecondaryView(
-                                pageManager: pm,
-                                adaptedPercentageWidth:
-                                    constraints.maxWidth * 3 / 7,
-                              ),
-                            ],
-                          );
-                        },
+                                SecondaryView(
+                                  pageManager: pm,
+                                  adaptedPercentageWidth:
+                                      constraints.maxWidth * 3 / 7,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                     )
                     .toList(),
@@ -180,11 +188,13 @@ class PageStack extends StatefulWidget {
   const PageStack({
     super.key,
     required this.pageManager,
+    required this.isActive,
     required this.delegate,
     required this.userProfile,
   });
 
   final PageManager pageManager;
+  final bool isActive;
   final HomeStackDelegate delegate;
   final UserProfilePB userProfile;
 
@@ -202,6 +212,7 @@ class _PageStackState extends State<PageStack>
       color: Theme.of(context).colorScheme.surface,
       child: FocusTraversalGroup(
         child: widget.pageManager.stackWidget(
+          isActive: widget.isActive,
           userProfile: widget.userProfile,
           onDeleted: (view, index) {
             widget.delegate.didDeleteStackWidget(view, index);
@@ -646,6 +657,12 @@ class PageNotifier extends ChangeNotifier {
   }
 
   Plugin get plugin => _plugin;
+
+  @override
+  void dispose() {
+    _plugin.dispose();
+    super.dispose();
+  }
 }
 
 // PageManager manages the view for one Tab
@@ -706,6 +723,7 @@ class PageManager {
   }
 
   Widget stackWidget({
+    required bool isActive,
     required UserProfilePB userProfile,
     required Function(ViewPB, int?) onDeleted,
   }) {
@@ -729,6 +747,7 @@ class PageManager {
                       userProfile: userProfile,
                     ),
                     shrinkWrap: false,
+                    data: {'tabActive': isActive},
                   );
 
                   return Padding(

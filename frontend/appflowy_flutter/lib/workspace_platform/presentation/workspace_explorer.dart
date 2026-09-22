@@ -6,20 +6,23 @@ import 'package:appflowy/plugins/resource_surface/resource_file_plugin.dart';
 import 'package:appflowy/plugins/resource_surface/resource_open_request.dart';
 import 'package:appflowy/plugins/resource_surface/resource_surface_dialog.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_action_registry.dart';
-import 'package:appflowy/plugins/resource_surface/helix/helix_settings.dart';
-import 'package:appflowy/plugins/resource_surface/helix/helix_warm_pool.dart';
 import 'package:appflowy/startup/plugin/plugin.dart';
 import 'package:appflowy/startup/startup.dart';
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
 import 'package:appflowy/workspace/presentation/widgets/dialog_v2.dart';
+import 'package:appflowy/workspace/presentation/widgets/muse_context_menu.dart';
 import 'package:appflowy/workspace_platform/application/workspace_controller.dart';
 import 'package:appflowy/workspace_platform/domain/workspace_models.dart';
 import 'package:appflowy/workspace/presentation/home/menu/sidebar/shared/sidebar_stack_panes.dart';
 import 'package:flowy_infra/file_picker/file_picker_service.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+
+const _kWorkspaceRowHeight = 30.0;
+const _kWorkspaceIndent = 10.0;
 
 final class MuseWorkspaceExplorer extends StatefulWidget {
   const MuseWorkspaceExplorer({
@@ -73,25 +76,6 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
       accountSpaceRef: widget.accountSpaceRef,
       title: widget.accountSpaceTitle,
     );
-    _warmHelixForWorkspace();
-  }
-
-  /// Starts one file-less Helix process for the first mounted folder so the
-  /// session's first code file does not pay Helix's process start either.
-  /// Best effort: the pool logs and gives up on failure.
-  void _warmHelixForWorkspace() {
-    if (!getIt.isRegistered<HelixSettingsController>()) return;
-    for (final mount in _controller.mounts) {
-      final locator = _controller.roots[mount.mountRef]?.locator;
-      if (locator == null || locator.isEmpty) continue;
-      unawaited(
-        HelixWarmPool.instance.warmUpForWorkspace(
-          getIt<HelixSettingsController>(),
-          locator,
-        ),
-      );
-      return;
-    }
   }
 
   bool get _expanded => widget.expanded ?? _sectionExpanded;
@@ -130,20 +114,29 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
                   child: body,
                 )
               : body;
-          return Column(
-            mainAxisSize:
-                widget.fillRemaining ? MainAxisSize.max : MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeader(context),
-              if (_expanded) const VSpace(4),
-              if (_expanded)
-                widget.fillRemaining
-                    ? Expanded(
-                        child: SingleChildScrollView(child: measured),
-                      )
-                    : measured,
-            ],
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // A bounded max height means this pane was given a cap by the
+              // sidebar stack. The tree must scroll inside it — never grow
+              // the parent Column (that paints the yellow overflow bar).
+              final bounded = widget.fillRemaining ||
+                  (constraints.hasBoundedHeight &&
+                      constraints.maxHeight.isFinite);
+              return Column(
+                mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeader(context),
+                  if (_expanded) const VSpace(4),
+                  if (_expanded)
+                    bounded
+                        ? Expanded(
+                            child: SingleChildScrollView(child: measured),
+                          )
+                        : measured,
+                ],
+              );
+            },
           );
         },
       );
@@ -208,7 +201,7 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
                 onOpen: _openEntry,
                 onContextMenu: _showEntryMenu,
               ),
-            const VSpace(6),
+            const VSpace(2),
           ],
           if (_controller.error case final error?)
             Padding(
@@ -273,72 +266,92 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
       }
     }
     if (!mounted) return;
-    final items = <PopupMenuEntry<String>>[
+    final hostCopyIds = {
+      'host.resource.copy-path',
+      'host.resource.copy-relative-path',
+    };
+    pluginActions.removeWhere((action) => hostCopyIds.contains(action.id));
+    final items = <MuseContextMenuEntry>[
       if (entry.isFile)
-        const PopupMenuItem(value: 'workspace.open', child: Text('Open')),
+        const MuseContextMenuAction(
+          id: 'workspace.open',
+          label: 'Open',
+          icon: Icons.open_in_new,
+        ),
       if (entry.isDirectory) ...[
-        const PopupMenuItem(
-          value: 'workspace.new-file',
-          child: Text('New File…'),
+        const MuseContextMenuAction(
+          id: 'workspace.new-file',
+          label: 'New File…',
+          icon: Icons.note_add_outlined,
         ),
-        const PopupMenuItem(
-          value: 'workspace.new-directory',
-          child: Text('New Folder…'),
+        const MuseContextMenuAction(
+          id: 'workspace.new-directory',
+          label: 'New Folder…',
+          icon: Icons.create_new_folder_outlined,
         ),
-        const PopupMenuItem(
-          value: 'workspace.import',
-          child: Text('Import Files…'),
+        const MuseContextMenuAction(
+          id: 'workspace.import',
+          label: 'Import Files…',
+          icon: Icons.file_upload_outlined,
         ),
-        const PopupMenuItem(
-          value: 'workspace.refresh',
-          child: Text('Refresh'),
+        const MuseContextMenuAction(
+          id: 'workspace.refresh',
+          label: 'Refresh',
+          icon: Icons.refresh,
         ),
       ],
-      if (pluginActions.isNotEmpty) const PopupMenuDivider(),
+      if (pluginActions.isNotEmpty) const MuseContextMenuDivider(),
       for (final action in pluginActions)
-        PopupMenuItem(
-          value: 'plugin:${action.id}',
+        MuseContextMenuAction(
+          id: 'plugin:${action.id}',
+          label: action.label,
+          icon: action.icon,
           enabled: action.enabled,
-          child: Row(
-            children: [
-              if (action.icon case final icon?) ...[
-                Icon(icon, size: 17),
-                const SizedBox(width: 8),
-              ],
-              Text(action.label),
-            ],
-          ),
+          submenuBuilder: action.submenuBuilder == null
+              ? null
+              : (ctx, close) => action.submenuBuilder!(ctx, close),
         ),
-      const PopupMenuDivider(),
+      const MuseContextMenuDivider(),
+      const MuseContextMenuAction(
+        id: 'workspace.copy-path',
+        label: 'Copy Path',
+        icon: Icons.content_copy_outlined,
+      ),
+      const MuseContextMenuAction(
+        id: 'workspace.copy-relative-path',
+        label: 'Copy Relative Path',
+        icon: Icons.account_tree_outlined,
+      ),
+      const MuseContextMenuDivider(),
       if (entry.parentEntryRef != null)
-        const PopupMenuItem(value: 'workspace.rename', child: Text('Rename…')),
-      const PopupMenuItem(
-        value: 'workspace.reveal',
-        child: Text('Reveal in Finder'),
+        const MuseContextMenuAction(
+          id: 'workspace.rename',
+          label: 'Rename…',
+          icon: Icons.drive_file_rename_outline,
+        ),
+      const MuseContextMenuAction(
+        id: 'workspace.reveal',
+        label: 'Reveal in Finder',
+        icon: Icons.folder_open_outlined,
       ),
       if (entry.parentEntryRef != null)
-        PopupMenuItem(
-          value: 'workspace.delete',
-          child: Text(
-            'Delete',
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
+        const MuseContextMenuAction(
+          id: 'workspace.delete',
+          label: 'Delete',
+          icon: Icons.delete_outline,
+          destructive: true,
         )
       else
-        const PopupMenuItem(
-          value: 'workspace.unmount',
-          child: Text('Remove Folder from Workspace'),
+        const MuseContextMenuAction(
+          id: 'workspace.unmount',
+          label: 'Remove Folder from Workspace',
+          icon: Icons.link_off,
         ),
     ];
-    final overlay =
-        Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final selected = await showMenu<String>(
+    final selected = await showMuseContextMenu(
       context: context,
-      position: RelativeRect.fromRect(
-        Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 0, 0),
-        Offset.zero & overlay.size,
-      ),
-      items: items,
+      globalPosition: globalPosition,
+      entries: items,
     );
     if (!mounted || selected == null) return;
     if (selected.startsWith('plugin:')) {
@@ -389,6 +402,12 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
         return;
       case 'workspace.refresh':
         await _guard(() => _controller.refresh(entry));
+        return;
+      case 'workspace.copy-path':
+        await Clipboard.setData(ClipboardData(text: entry.locator));
+        return;
+      case 'workspace.copy-relative-path':
+        await Clipboard.setData(ClipboardData(text: _relativePath(entry)));
         return;
       case 'workspace.rename':
         final name = await _prompt('Rename', 'New name', initial: entry.name);
@@ -442,6 +461,18 @@ final class _MuseWorkspaceExplorerState extends State<MuseWorkspaceExplorer> {
     return confirmed;
   }
 
+  String _relativePath(MuseWorkspaceEntry entry) {
+    final mount = _controller.mounts
+        .where((candidate) => candidate.mountRef == entry.mountRef)
+        .firstOrNull;
+    if (mount == null) return entry.name;
+    if (p.equals(mount.rootLocator, entry.locator)) return '.';
+    if (p.isWithin(mount.rootLocator, entry.locator)) {
+      return p.relative(entry.locator, from: mount.rootLocator);
+    }
+    return entry.locator;
+  }
+
   Future<T?> _guard<T>(Future<T> Function() operation) async {
     try {
       return await operation();
@@ -477,6 +508,7 @@ final class _EntryNode extends StatelessWidget {
     final selected = controller.selectedEntryRef == entry.entryRef;
     final childEntries = controller.children[entry.entryRef] ?? const [];
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         GestureDetector(
@@ -484,45 +516,47 @@ final class _EntryNode extends StatelessWidget {
           onSecondaryTapDown: (details) =>
               onContextMenu(entry, details.globalPosition),
           child: SizedBox(
-            height: HomeSpaceViewSizes.viewHeight,
-            child: FlowyButton(
-              isSelected: selected,
-              onTap: () => onOpen(entry),
-              margin: EdgeInsets.only(
-                left: 8.0 + depth * HomeSpaceViewSizes.leftPadding,
-                right: 6,
-              ),
-              text: Row(
-                children: [
-                  SizedBox(
-                    width: 16,
-                    child: entry.isDirectory
-                        ? FlowySvg(
-                            expanded
-                                ? FlowySvgs.workspace_drop_down_menu_show_s
-                                : FlowySvgs.workspace_drop_down_menu_hide_s,
-                          )
-                        : null,
-                  ),
-                  const HSpace(2),
-                  Icon(
-                    _icon(entry),
-                    size: 16,
-                    color: _iconColor(context, entry),
-                  ),
-                  const HSpace(6),
-                  Expanded(
-                    child: FlowyText(
-                      entry.name,
-                      overflow: TextOverflow.ellipsis,
+            height: _kWorkspaceRowHeight,
+            child: ClipRect(
+              child: FlowyButton(
+                isSelected: selected,
+                onTap: () => onOpen(entry),
+                margin: EdgeInsets.only(
+                  left: 6.0 + depth * _kWorkspaceIndent,
+                  right: 4,
+                ),
+                text: Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      child: entry.isDirectory
+                          ? FlowySvg(
+                              expanded
+                                  ? FlowySvgs.workspace_drop_down_menu_show_s
+                                  : FlowySvgs.workspace_drop_down_menu_hide_s,
+                            )
+                          : null,
                     ),
-                  ),
-                  if (loading)
-                    const SizedBox.square(
-                      dimension: 12,
-                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    const HSpace(2),
+                    Icon(
+                      _icon(entry),
+                      size: 14,
+                      color: _iconColor(context, entry),
                     ),
-                ],
+                    const HSpace(4),
+                    Expanded(
+                      child: FlowyText(
+                        entry.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (loading)
+                      const SizedBox.square(
+                        dimension: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -562,8 +596,12 @@ final class _EntryNode extends StatelessWidget {
     return Icons.insert_drive_file_outlined;
   }
 
-  Color? _iconColor(BuildContext context, MuseWorkspaceEntry entry) =>
-      entry.isDirectory ? Theme.of(context).colorScheme.primary : null;
+  Color? _iconColor(BuildContext context, MuseWorkspaceEntry entry) {
+    if (!entry.isDirectory) return null;
+    final base = Theme.of(context).iconTheme.color ??
+        Theme.of(context).colorScheme.onSurface;
+    return base.withValues(alpha: 0.55);
+  }
 }
 
 final class _ExplorerResourceTarget implements MuseResourceTabTarget {
@@ -585,6 +623,7 @@ final class _ExplorerResourceTarget implements MuseResourceTabTarget {
       engine: engine,
       origin: resource.origin,
       line: resource.line,
+      performanceTrace: resource.performanceTrace,
     );
     getIt<TabsBloc>().openExternalPlugin(MuseResourceFilePlugin(resolved));
   }

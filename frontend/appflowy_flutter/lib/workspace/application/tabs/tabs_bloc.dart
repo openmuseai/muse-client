@@ -17,6 +17,7 @@ import 'package:appflowy_result/appflowy_result.dart';
 import 'package:bloc/bloc.dart';
 import 'package:collection/collection.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flutter/widgets.dart';
 
 part 'tabs_bloc.freezed.dart';
 
@@ -55,19 +56,22 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
           closeTab: (String pluginId) {
             final pm = state._pageManagers
                 .firstWhereOrNull((pm) => pm.plugin.id == pluginId);
-            if (pm?.isPinned == true) {
+            if (pm?.isPinned == true || state.pages == 1) {
               return;
             }
 
             emit(state.closeView(pluginId));
+            if (pm != null) _disposeAfterFrame([pm]);
             _setLatestOpenView();
           },
           closeCurrentTab: () {
-            if (state.currentPageManager.isPinned) {
+            if (state.currentPageManager.isPinned || state.pages == 1) {
               return;
             }
 
-            emit(state.closeView(state.currentPageManager.plugin.id));
+            final closing = state.currentPageManager;
+            emit(state.closeView(closing.plugin.id));
+            _disposeAfterFrame([closing]);
             _setLatestOpenView();
           },
           openTab: (Plugin plugin, ViewPB view) {
@@ -108,6 +112,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
             }
           },
           closeOtherTabs: (String pluginId) {
+            final closing = [
+              ...state._pageManagers.where(
+                (pm) => pm.plugin.id != pluginId && !pm.isPinned,
+              ),
+            ];
             final pageManagers = [
               ...state._pageManagers
                   .where((pm) => pm.plugin.id == pluginId || pm.isPinned),
@@ -129,6 +138,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
                 pageManagers: pageManagers,
               ),
             );
+            _disposeAfterFrame(closing);
 
             _setLatestOpenView();
           },
@@ -223,11 +233,22 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
                 newstate.closeView(pm.plugin.id);
               }
               emit(newstate.copyWith(currentIndex: 0));
+              _disposeAfterFrame(pagesToClose);
             }
           },
         );
       },
     );
+  }
+
+  void _disposeAfterFrame(Iterable<PageManager> managers) {
+    final removed = managers.toList(growable: false);
+    if (removed.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final manager in removed) {
+        manager.dispose();
+      }
+    });
   }
 
   void _setLatestOpenView([ViewPB? view]) {
@@ -394,15 +415,20 @@ class TabsState {
       return this;
     }
 
-    _pageManagers.removeWhere((pm) => pm.plugin.id == pluginId);
+    final removedIndex =
+        _pageManagers.indexWhere((pm) => pm.plugin.id == pluginId);
+    if (removedIndex == -1) return this;
+    _pageManagers.removeAt(removedIndex);
 
     /// If currentIndex is greater than the amount of allowed indices
     /// And the current selected tab isn't the first (index 0)
     ///   as currentIndex cannot be -1
     /// Then decrease currentIndex by 1
-    final newIndex = currentIndex > pages - 1 && currentIndex > 0
+    final newIndex = removedIndex < currentIndex
         ? currentIndex - 1
-        : currentIndex;
+        : currentIndex > pages - 1
+            ? pages - 1
+            : currentIndex;
 
     return copyWith(
       currentIndex: newIndex,

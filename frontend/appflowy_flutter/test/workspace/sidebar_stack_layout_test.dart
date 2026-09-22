@@ -4,7 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const ids = ['project', 'personal'];
 
-  test('fits: both stay expanded and nothing fills leftover space', () {
+  test('fits: both stay expanded and the active space fills leftover height',
+      () {
     final decision = resolveSidebarStackLayout(
       paneIds: ids,
       expandedIds: {'project', 'personal'},
@@ -13,7 +14,7 @@ void main() {
       availableHeight: 400,
     );
     expect(decision.expandedIds, {'project', 'personal'});
-    expect(decision.fillingId, isNull);
+    expect(decision.fillingId, 'project');
   });
 
   test('overflow with two expanded collapses others and fills the active space',

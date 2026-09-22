@@ -1,14 +1,16 @@
+import 'dart:async';
+
 import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/workspace/application/tabs/tabs_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/home_sizes.dart';
 import 'package:appflowy/workspace/presentation/home/home_stack.dart';
 import 'package:appflowy/startup/plugin/plugin.dart';
+import 'package:appflowy/workspace/presentation/widgets/muse_context_menu.dart';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
@@ -60,7 +62,9 @@ class _FlowyTabState extends State<FlowyTab> {
           ),
           builder: (context, isHovering) => AppFlowyPopover(
             controller: controller,
-            offset: const Offset(4, 4),
+            offset: const Offset(0, 8),
+            direction: PopoverDirection.bottomWithLeftAligned,
+            constraints: museContextMenuConstraints,
             triggerActions: PopoverTriggerFlags.secondaryClick,
             showAtCursor: true,
             popupBuilder: (_) => BlocProvider.value(
@@ -80,65 +84,58 @@ class _FlowyTabState extends State<FlowyTab> {
                   padding: EdgeInsets.symmetric(
                     horizontal: current ? 14.0 : 10.0,
                   ),
-                  child: Listener(
-                    onPointerDown: (event) {
-                      if (event.buttons == kPrimaryButton) {
-                        widget.onTap();
-                      }
-                    },
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onPanStart: (_) {},
-                      child: SizedBox(
-                        height: HomeSizes.tabBarHeight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (current)
-                              widget.pageManager.notifier.tabBarWidget(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: widget.onTap,
+                    onPanStart: (_) {},
+                    child: SizedBox(
+                      height: HomeSizes.tabBarHeight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (current)
+                            widget.pageManager.notifier.tabBarWidget(
+                              widget.pageManager.plugin.id,
+                              pinned,
+                            )
+                          else
+                            Flexible(
+                              child: widget.pageManager.notifier.tabBarWidget(
                                 widget.pageManager.plugin.id,
                                 pinned,
-                              )
-                            else
-                              Flexible(
-                                child: widget.pageManager.notifier.tabBarWidget(
-                                  widget.pageManager.plugin.id,
-                                  pinned,
+                              ),
+                            ),
+                          if (widget.pageManager.plugin
+                              is PluginTabMenuContributor)
+                            Visibility(
+                              visible: isHovering || current,
+                              child: SizedBox(
+                                width: 24,
+                                height: 26,
+                                child: FlowyIconButton(
+                                  tooltipText: 'Tab actions',
+                                  onPressed: controller.show,
+                                  icon: const Icon(Icons.more_horiz, size: 17),
                                 ),
                               ),
-                            if (widget.pageManager.plugin
-                                is PluginTabMenuContributor)
-                              Visibility(
-                                visible: isHovering || current,
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 26,
-                                  child: FlowyIconButton(
-                                    tooltipText: 'Tab actions',
-                                    onPressed: controller.show,
-                                    icon:
-                                        const Icon(Icons.more_horiz, size: 17),
+                            ),
+                          if (!pinned) ...[
+                            Visibility(
+                              visible: isHovering || current,
+                              child: SizedBox(
+                                width: 26,
+                                height: 26,
+                                child: FlowyIconButton(
+                                  onPressed: () => _closeTab(context),
+                                  icon: const FlowySvg(
+                                    FlowySvgs.close_s,
+                                    size: Size.square(22),
                                   ),
                                 ),
                               ),
-                            if (!pinned) ...[
-                              Visibility(
-                                visible: isHovering || current,
-                                child: SizedBox(
-                                  width: 26,
-                                  height: 26,
-                                  child: FlowyIconButton(
-                                    onPressed: () => _closeTab(context),
-                                    icon: const FlowySvg(
-                                      FlowySvgs.close_s,
-                                      size: Size.square(22),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
@@ -186,123 +183,92 @@ class TabMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SeparatedColumn(
-      separatorBuilder: () => const VSpace(4),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Opacity(
-          opacity: isPinned ? 0.5 : 1,
-          child: _wrapInTooltip(
-            shouldWrap: isPinned,
-            message: LocaleKeys.tabMenu_closeDisabledHint.tr(),
-            child: FlowyButton(
-              text: FlowyText.regular(LocaleKeys.tabMenu_close.tr()),
-              onTap: () => _closeTab(context),
-              disable: isPinned,
-            ),
-          ),
-        ),
-        Opacity(
-          opacity: isAllPinned ? 0.5 : 1,
-          child: _wrapInTooltip(
-            shouldWrap: true,
-            message: isAllPinned
-                ? LocaleKeys.tabMenu_closeOthersDisabledHint.tr()
-                : LocaleKeys.tabMenu_closeOthersHint.tr(),
-            child: FlowyButton(
-              text: FlowyText.regular(
-                LocaleKeys.tabMenu_closeOthers.tr(),
-              ),
-              onTap: () => _closeOtherTabs(context),
-              disable: isAllPinned,
-            ),
-          ),
-        ),
-        if (plugin case final PluginTabMenuContributor contributor) ...[
-          const Divider(height: 0.5),
-          ..._pluginActions(context, contributor),
-        ],
-        const Divider(height: 0.5),
-        FlowyButton(
-          text: FlowyText.regular(
-            isPinned
-                ? LocaleKeys.tabMenu_unpinTab.tr()
-                : LocaleKeys.tabMenu_pinTab.tr(),
-          ),
-          onTap: () => _togglePin(context),
-        ),
+    final entries = <MuseContextMenuEntry>[
+      MuseContextMenuAction(
+        id: 'tab.close',
+        label: LocaleKeys.tabMenu_close.tr(),
+        icon: Icons.close,
+        enabled: !isPinned,
+      ),
+      MuseContextMenuAction(
+        id: 'tab.close-others',
+        label: LocaleKeys.tabMenu_closeOthers.tr(),
+        icon: Icons.copy_all_outlined,
+        enabled: !isAllPinned,
+      ),
+      if (plugin case final PluginTabMenuContributor contributor) ...[
+        const MuseContextMenuDivider(),
+        ..._pluginEntries(context, contributor),
       ],
+      const MuseContextMenuDivider(),
+      MuseContextMenuAction(
+        id: 'tab.pin',
+        label: isPinned
+            ? LocaleKeys.tabMenu_unpinTab.tr()
+            : LocaleKeys.tabMenu_pinTab.tr(),
+        icon: isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+      ),
+    ];
+    return ConstrainedBox(
+      constraints: museContextMenuConstraints,
+      child: MuseContextMenuBody(
+        entries: entries,
+        onSelected: (id) => _onSelected(context, id),
+        onDismiss: controller.close,
+      ),
     );
   }
 
-  List<Widget> _pluginActions(
+  List<MuseContextMenuEntry> _pluginEntries(
     BuildContext context,
     PluginTabMenuContributor contributor,
   ) {
     final actions = contributor.tabMenuActions(context);
-    final widgets = <Widget>[];
+    final entries = <MuseContextMenuEntry>[];
     int? previousGroup;
     for (final action in actions) {
       if (previousGroup != null && previousGroup != action.group) {
-        widgets.add(const Divider(height: 0.5));
+        entries.add(const MuseContextMenuDivider());
       }
       previousGroup = action.group;
-      widgets.add(
-        Opacity(
-          opacity: action.enabled ? 1 : 0.45,
-          child: action.submenuBuilder == null
-              ? FlowyButton(
-                  leftIcon:
-                      action.icon == null ? null : Icon(action.icon, size: 16),
-                  text: FlowyText.regular(action.label),
-                  disable: !action.enabled,
-                  onTap: () async {
-                    controller.close();
-                    await action.invoke(context);
-                  },
-                )
-              : AppFlowyPopover(
-                  triggerActions:
-                      PopoverTriggerFlags.hover | PopoverTriggerFlags.click,
-                  offset: const Offset(6, 0),
-                  constraints: const BoxConstraints(
-                    minWidth: 240,
-                    maxWidth: 320,
-                    maxHeight: 420,
-                  ),
-                  popupBuilder: (ctx) => action.submenuBuilder!(
-                    ctx,
-                    controller.close,
-                  ),
-                  child: FlowyButton(
-                    leftIcon: action.icon == null
-                        ? null
-                        : Icon(action.icon, size: 16),
-                    rightIcon: const Icon(Icons.chevron_right, size: 16),
-                    text: FlowyText.regular(action.label),
-                    disable: !action.enabled,
-                    onTap: () {},
-                  ),
-                ),
+      entries.add(
+        MuseContextMenuAction(
+          id: 'plugin:${action.id}',
+          label: action.label,
+          icon: action.icon,
+          enabled: action.enabled,
+          submenuBuilder: action.submenuBuilder == null
+              ? null
+              : (ctx, close) => action.submenuBuilder!(ctx, close),
         ),
       );
     }
-    return widgets;
+    return entries;
   }
 
-  Widget _wrapInTooltip({
-    required bool shouldWrap,
-    String? message,
-    required Widget child,
-  }) {
-    if (shouldWrap) {
-      return FlowyTooltip(
-        message: message,
-        child: child,
-      );
+  void _onSelected(BuildContext context, String id) {
+    switch (id) {
+      case 'tab.close':
+        _closeTab(context);
+        return;
+      case 'tab.close-others':
+        _closeOtherTabs(context);
+        return;
+      case 'tab.pin':
+        _togglePin(context);
+        return;
     }
-
-    return child;
+    if (!id.startsWith('plugin:')) return;
+    final pluginId = id.substring('plugin:'.length);
+    if (plugin case final PluginTabMenuContributor contributor) {
+      final action = contributor
+          .tabMenuActions(context)
+          .where((candidate) => candidate.id == pluginId)
+          .firstOrNull;
+      if (action == null) return;
+      controller.close();
+      unawaited(Future<void>.value(action.invoke(context)));
+    }
   }
 
   void _closeTab(BuildContext context) {
