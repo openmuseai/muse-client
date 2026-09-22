@@ -18,9 +18,12 @@ import 'package:appflowy/user/application/reminder/reminder_bloc.dart';
 import 'package:appflowy/user/application/user_listener.dart';
 import 'package:appflowy/user/presentation/router.dart';
 import 'package:appflowy/plugins/dsh_agent/dsh_agent_controller.dart';
+import 'package:appflowy/plugins/resource_surface/engine_registry.dart';
+import 'package:appflowy/plugins/resource_surface/engines/register.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_language_servers.dart';
 import 'package:appflowy/plugins/resource_surface/helix/helix_settings.dart';
 import 'package:appflowy/plugins/resource_surface/muse_presentation_channel.dart';
+import 'package:appflowy/plugins/resource_surface/resource_open_defaults.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_action_registry.dart';
 import 'package:appflowy/plugins/resource_surface/resource_tab_actions.dart';
 import 'package:appflowy/plugins/version_diff/application/text_version_diff_service.dart';
@@ -264,6 +267,11 @@ void _resolveHomeDeps(GetIt getIt) {
       repository: getIt<MuseTextVersionRepository>(),
       provider: getIt<MuseImageOverlayDiffProvider>(),
     ),
+  );
+  final resourceEngines = builtinResourceEngineRegistry();
+  getIt.registerSingleton<MuseResourceEngineRegistry>(resourceEngines);
+  getIt.registerLazySingleton<MuseResourceOpenDefaults>(
+    MuseResourceOpenDefaults.new,
   );
   final resourceTabActions = MuseResourceTabActionRegistry();
   registerDefaultMuseResourceTabActions(resourceTabActions);

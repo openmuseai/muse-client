@@ -134,4 +134,7 @@ class KVKeys {
 
   /// Helix editor plugin settings (theme, keymap, font, background, LSP).
   static const String helixSettings = 'muse.helixSettings';
+
+  /// Per-extension default local resource engine (`{"md":"helix"}`).
+  static const String resourceOpenDefaults = 'muse.resourceOpenDefaults';
 }
