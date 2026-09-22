@@ -11,6 +11,11 @@ HELIX_OUT="$APP_DIR/assets/engines/helix"
 
 mkdir -p "$VIEWER_OUT" "$HELIX_OUT"
 pnpm --dir "$VIEWER_VENDOR" install --frozen-lockfile
+# WKWebView loads Flutter assets through file:// on macOS. Safari/WebKit does
+# not execute module entry points from that opaque local origin, so the macOS
+# viewer must remain a classic self-contained script. Windows has a virtual
+# HTTPS host and keeps its separately built ESM/code-split bundle.
+find "$VIEWER_OUT" -maxdepth 1 -type f -name 'lazy-*.js' -delete
 pnpm --dir "$VIEWER_VENDOR" exec esbuild \
   "$APP_DIR/tool/open_file_viewer/muse_viewer.ts" \
   --bundle --format=iife --platform=browser --target=safari16 \
