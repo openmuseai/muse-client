@@ -399,186 +399,211 @@ class _LanguageServerSetupDialogState extends State<_LanguageServerSetupDialog> 
       defaultConfigDir = '';
     }
     return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          padding: const EdgeInsets.fromLTRB(20, 16, 16, 20),
+          decoration: context.getPopoverDecoration(),
           child: AnimatedBuilder(
             animation: _installer,
             builder: (context, _) {
               return SingleChildScrollView(
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: FlowyText('Language Server', fontSize: 18),
-                      ),
-                      FlowyIconButton(
-                        width: 24,
-                        icon: const Icon(Icons.close, size: 16),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
-                  ),
-                  const VSpace(8),
-                  FlowyText.regular(
-                    '选择编程语言后可一键下载对应 Language Server，或填入本机已有的可执行文件路径。',
-                    fontSize: 12,
-                    maxLines: 3,
-                    color: Theme.of(context).hintColor,
-                  ),
-                  const VSpace(16),
-                  FlowyText.medium('编程语言', fontSize: 13),
-                  const VSpace(6),
-                  SettingsDropdown<String>(
-                    selectedOption: _selectedId,
-                    onChanged: _selectPackage,
-                    options: [
-                      for (final package in helixLspCatalog)
-                        buildDropdownMenuEntry<String>(
-                          context,
-                          value: package.id,
-                          label: '${package.languages} · ${package.label}',
-                          selectedValue: _selectedId,
-                        ),
-                    ],
-                  ),
-                  const VSpace(12),
-                  FlowyText.regular(
-                    '$readyLabel${status?.resolvedPath == null ? '' : ' · ${status!.resolvedPath}'}',
-                    fontSize: 12,
-                    maxLines: 2,
-                    color: status?.ready == true
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).hintColor,
-                  ),
-                  const VSpace(8),
-                  Theme(
-                    data: Theme.of(context)
-                        .copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      initiallyExpanded: true,
-                      tilePadding: EdgeInsets.zero,
-                      childrenPadding: const EdgeInsets.only(top: 8),
-                      title: const FlowyText('展开配置', fontSize: 13),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
                       children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FlowyButton(
-                            useIntrinsicWidth: true,
-                            disable: installing || _installer.busyId != null,
-                            text: FlowyText(
-                              installing
-                                  ? '正在下载 ${_package.label}…'
-                                  : '一键下载 ${_package.label}',
-                              fontSize: 13,
-                            ),
-                            onTap: _install,
+                        const Expanded(
+                          child: FlowyText(
+                            'Language Server',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        if (installing && _installer.progress > 0) ...[
-                          const VSpace(8),
-                          LinearProgressIndicator(value: _installer.progress),
-                        ],
-                        const VSpace(12),
-                        FlowyText.medium('本地可执行文件', fontSize: 13),
-                        const VSpace(4),
-                        FlowyText.regular(
-                          _package.binaryHint,
-                          fontSize: 11,
-                          maxLines: 3,
-                          color: Theme.of(context).hintColor,
+                        FlowyIconButton(
+                          width: 24,
+                          icon: const Icon(Icons.close, size: 16),
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
-                        const VSpace(6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FlowyTextField(
-                                controller: _commandController,
-                                hintText: '/usr/local/bin/${_package.helixCommand}',
-                              ),
-                            ),
-                            const HSpace(8),
-                            FlowyButton(
-                              useIntrinsicWidth: true,
-                              text: const FlowyText('浏览', fontSize: 13),
-                              onTap: () => _pickFile(config: false),
-                            ),
-                          ],
-                        ),
-                        const VSpace(12),
-                        FlowyText.medium('配置文件', fontSize: 13),
-                        const VSpace(4),
-                        FlowyText.regular(
-                          '默认配置目录：$defaultConfigDir',
-                          fontSize: 11,
-                          maxLines: 2,
-                          color: Theme.of(context).hintColor,
-                        ),
-                        if (_package.defaultConfigFiles.isNotEmpty)
-                          FlowyText.regular(
-                            '常见文件：${_package.defaultConfigFiles.join('、')}',
-                            fontSize: 11,
-                            maxLines: 3,
-                            color: Theme.of(context).hintColor,
-                          ),
-                        const VSpace(6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FlowyTextField(
-                                controller: _configController,
-                                hintText: '$defaultConfigDir/languages.toml',
-                              ),
-                            ),
-                            const HSpace(8),
-                            FlowyButton(
-                              useIntrinsicWidth: true,
-                              text: const FlowyText('浏览', fontSize: 13),
-                              onTap: () => _pickFile(config: true),
-                            ),
-                          ],
-                        ),
-                        const VSpace(12),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FlowyButton(
-                            useIntrinsicWidth: true,
-                            text: const FlowyText('保存本地路径', fontSize: 13),
-                            onTap: _saveOverride,
-                          ),
-                        ),
-                        if (_pathError != null) ...[
-                          const VSpace(8),
-                          FlowyText.regular(
-                            _pathError!,
-                            fontSize: 12,
-                            maxLines: 3,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ],
                       ],
                     ),
-                  ),
-                  if (_installer.message != null) ...[
                     const VSpace(8),
                     FlowyText.regular(
-                      _installer.message!,
+                      '选择编程语言后可一键下载对应 Language Server，或填入本机已有的可执行文件路径。',
                       fontSize: 12,
-                      maxLines: 4,
+                      maxLines: 3,
                       color: Theme.of(context).hintColor,
                     ),
+                    const VSpace(16),
+                    const FlowyText.medium('编程语言', fontSize: 13),
+                    const VSpace(6),
+                    SettingsDropdown<String>(
+                      selectedOption: _selectedId,
+                      onChanged: _selectPackage,
+                      options: [
+                        for (final package in helixLspCatalog)
+                          buildDropdownMenuEntry<String>(
+                            context,
+                            value: package.id,
+                            label: '${package.languages} · ${package.label}',
+                            selectedValue: _selectedId,
+                          ),
+                      ],
+                    ),
+                    const VSpace(8),
+                    FlowyText.regular(
+                      '$readyLabel${status?.resolvedPath == null ? '' : ' · ${status!.resolvedPath}'}',
+                      fontSize: 12,
+                      maxLines: 2,
+                      color: status?.ready == true
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).hintColor,
+                    ),
+                    const VSpace(16),
+                    FlowyButton(
+                      useIntrinsicWidth: true,
+                      disable: installing || _installer.busyId != null,
+                      text: FlowyText(
+                        installing
+                            ? '正在下载 ${_package.label}…'
+                            : '一键下载 ${_package.label}',
+                        fontSize: 13,
+                      ),
+                      onTap: _install,
+                    ),
+                    if (installing && _installer.progress > 0) ...[
+                      const VSpace(8),
+                      LinearProgressIndicator(value: _installer.progress),
+                    ],
+                    const VSpace(16),
+                    _HintLabel(
+                      label: '本地可执行文件',
+                      hint: _package.binaryHint,
+                    ),
+                    const VSpace(6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FlowyTextField(
+                            controller: _commandController,
+                            hintText:
+                                '/usr/local/bin/${_package.helixCommand}',
+                          ),
+                        ),
+                        const HSpace(8),
+                        FlowyButton(
+                          useIntrinsicWidth: true,
+                          text: const FlowyText('浏览', fontSize: 13),
+                          onTap: () => _pickFile(config: false),
+                        ),
+                      ],
+                    ),
+                    const VSpace(16),
+                    _HintLabel(
+                      label: '配置文件',
+                      hint: [
+                        if (defaultConfigDir.isNotEmpty)
+                          '默认配置目录：$defaultConfigDir',
+                        if (_package.defaultConfigFiles.isNotEmpty)
+                          '常见文件：${_package.defaultConfigFiles.join('、')}',
+                      ].join('\n'),
+                    ),
+                    const VSpace(6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FlowyTextField(
+                            controller: _configController,
+                            hintText: '$defaultConfigDir/languages.toml',
+                          ),
+                        ),
+                        const HSpace(8),
+                        FlowyButton(
+                          useIntrinsicWidth: true,
+                          text: const FlowyText('浏览', fontSize: 13),
+                          onTap: () => _pickFile(config: true),
+                        ),
+                      ],
+                    ),
+                    const VSpace(16),
+                    FlowyButton(
+                      useIntrinsicWidth: true,
+                      text: const FlowyText('保存本地路径', fontSize: 13),
+                      onTap: _saveOverride,
+                    ),
+                    if (_pathError != null) ...[
+                      const VSpace(8),
+                      FlowyText.regular(
+                        _pathError!,
+                        fontSize: 12,
+                        maxLines: 3,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ],
+                    if (_installer.message != null) ...[
+                      const VSpace(8),
+                      FlowyText.regular(
+                        _installer.message!,
+                        fontSize: 12,
+                        maxLines: 4,
+                        color: Theme.of(context).hintColor,
+                      ),
+                    ],
                   ],
-                ],
-              ),
+                ),
               );
             },
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HintLabel extends StatelessWidget {
+  const _HintLabel({required this.label, required this.hint});
+
+  final String label;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FlowyText.medium(label, fontSize: 13),
+        if (hint.trim().isNotEmpty)
+          Transform.translate(
+            offset: const Offset(1, -4),
+            child: AppFlowyPopover(
+              direction: PopoverDirection.bottomWithLeftAligned,
+              offset: const Offset(0, 6),
+              constraints: const BoxConstraints(maxWidth: 320),
+              popupBuilder: (_) => Padding(
+                padding: const EdgeInsets.all(10),
+                child: FlowyText.regular(
+                  hint,
+                  fontSize: 12,
+                  maxLines: 8,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(
+                  Icons.info_outline,
+                  size: 13,
+                  color: Theme.of(context).hintColor,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
