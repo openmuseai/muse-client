@@ -391,4 +391,48 @@ void main() {
       );
     }
   });
+
+  test('upsertEnvFile keeps sibling secrets', () {
+    const existing = 'DEEPSEEK_API_KEY=sk-old\nOPENCODE_GO_API_KEY=go-key\n';
+    final next = DshSidecar.upsertEnvFile(
+      existing,
+      'OPENCODE_CUSTOM_API_KEY',
+      'sk-custom',
+    );
+    expect(next, contains('DEEPSEEK_API_KEY=sk-old'));
+    expect(next, contains('OPENCODE_GO_API_KEY=go-key'));
+    expect(next, contains('OPENCODE_CUSTOM_API_KEY=sk-custom'));
+    final replaced = DshSidecar.upsertEnvFile(
+      next,
+      'DEEPSEEK_API_KEY',
+      'sk-new',
+    );
+    expect(replaced, contains('DEEPSEEK_API_KEY=sk-new'));
+    expect(replaced, contains('OPENCODE_CUSTOM_API_KEY=sk-custom'));
+    expect(replaced, isNot(contains('sk-old')));
+  });
+
+  test('seedGatewaySettings copies defaults once', () {
+    final root = Directory.systemTemp.createTempSync('muse-gw-seed-');
+    addTearDown(() => root.deleteSync(recursive: true));
+    File('${root.path}/defaults/settings.yaml')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('agent-default-model:\n  provider: opencode-custom\n');
+    final layout = DshRuntimeLayout(
+      bundled: true,
+      museRoot: root.path,
+      dshHome: '${root.path}/dsh-home',
+      harnessDir: '${root.path}/dsh',
+      patchFile: '${root.path}/patch.yml',
+      nodeBin: null,
+      credentialsFile: '${root.path}/credentials.env',
+    );
+    DshSidecar.seedGatewaySettings(layout);
+    final dest = File('${layout.dshHome}/settings.yaml');
+    expect(dest.existsSync(), isTrue);
+    expect(dest.readAsStringSync(), contains('opencode-custom'));
+    dest.writeAsStringSync('keep-me:\n  yes: 1\n');
+    DshSidecar.seedGatewaySettings(layout);
+    expect(dest.readAsStringSync(), contains('keep-me'));
+  });
 }

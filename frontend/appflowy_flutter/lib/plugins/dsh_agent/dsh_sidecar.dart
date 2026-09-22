@@ -59,7 +59,15 @@ class DshSidecar {
           'DEEPSEEK_API_KEY is missing. Enter it in the DeepSeek panel.',
         );
       }
+      final secretsToRedact = <String>[
+        key,
+        ...[
+          for (final name in gatewayApiKeyEnvNames)
+            await _namedSecret(name) ?? '',
+        ].where((value) => value.isNotEmpty),
+      ];
       Directory(dshHome).createSync(recursive: true);
+      seedGatewaySettings(layout);
       if (layout.closureEntry != null) {
         seedClosurePlugins(layout);
       } else {
@@ -105,13 +113,13 @@ class DshSidecar {
         );
         unawaited(
           _process!.stdout.transform(utf8.decoder).forEach((chunk) {
-            _rememberLog(chunk, key);
+            _rememberLog(chunk, secretsToRedact);
             debugPrint('[dsh-sidecar] $chunk');
           }),
         );
         unawaited(
           _process!.stderr.transform(utf8.decoder).forEach((chunk) {
-            _rememberLog(chunk, key);
+            _rememberLog(chunk, secretsToRedact);
             debugPrint('[dsh-sidecar:err] $chunk');
           }),
         );
@@ -168,6 +176,12 @@ class DshSidecar {
       // sibling Resources/muse/packages copies.
       'NODE_PATH': '${resolved.harnessDir}/node_modules',
     };
+    for (final name in gatewayApiKeyEnvNames) {
+      final value = await _namedSecret(name);
+      if (value != null && value.isNotEmpty) {
+        environment[name] = value;
+      }
+    }
     environment['MUSE_PLUGIN_DIAGNOSTICS'] ??= '1';
     if (resolved.bundled) {
       environment['MUSE_BUNDLE_ROOT'] = resolved.museRoot;
@@ -850,14 +864,16 @@ class DshSidecar {
 
   /// Loader baseUrl is the profile directory; ESM does not consult NODE_PATH.
   void _seedDshMarket(DshRuntimeLayout resolved) {
-    final source = Directory('${resolved.harnessDir}/node_modules/dshmarket');
-    if (!source.existsSync()) return;
-    for (final destDir in [
-      '${resolved.dshHome}/profiles/node_modules',
-      '${resolved.dshHome}/profiles/web/node_modules',
-    ]) {
-      Directory(destDir).createSync(recursive: true);
-      _replaceWithLink('$destDir/dshmarket', source.path);
+    for (final pkg in ['dshmarket', 'dsh-model-capabilities']) {
+      final source = Directory('${resolved.harnessDir}/node_modules/$pkg');
+      if (!source.existsSync()) continue;
+      for (final destDir in [
+        '${resolved.dshHome}/profiles/node_modules',
+        '${resolved.dshHome}/profiles/web/node_modules',
+      ]) {
+        Directory(destDir).createSync(recursive: true);
+        _replaceWithLink('$destDir/$pkg', source.path);
+      }
     }
   }
 
@@ -877,7 +893,7 @@ class DshSidecar {
     } catch (_) {}
   }
 
-  void _rememberLog(String chunk, String apiKey) {
+  void _rememberLog(String chunk, List<String> secrets) {
     final data = '$_logRemainder$chunk';
     final lines = const LineSplitter().convert(data);
     final complete = data.endsWith('\n') || data.endsWith('\r')
@@ -888,7 +904,11 @@ class DshSidecar {
         : (lines.isEmpty ? data : lines.last);
     for (final rawLine in complete) {
       _captureLaunchUrl(rawLine);
-      final line = rawLine.replaceAll(apiKey, '[REDACTED]').trim();
+      var line = rawLine;
+      for (final secret in secrets) {
+        if (secret.isNotEmpty) line = line.replaceAll(secret, '[REDACTED]');
+      }
+      line = line.trim();
       if (line.isEmpty) continue;
       _logTail.add(line);
       if (_logTail.length > 40) _logTail.removeAt(0);
@@ -938,8 +958,18 @@ class DshSidecar {
     }
   }
 
-  Future<String?> _apiKey() async {
-    final fromEnv = Platform.environment['DEEPSEEK_API_KEY'];
+  /// Extra `apiKeyEnv` names from the gateway default `settings.yaml`.
+  /// Finder-launched apps have no shell export; these must come from
+  /// [credentialsFile] (or `.env.dsh.local` in a source checkout).
+  static const gatewayApiKeyEnvNames = <String>[
+    'OPENCODE_CUSTOM_API_KEY',
+    'OPENCODE_GO_API_KEY',
+  ];
+
+  Future<String?> _apiKey() => _namedSecret('DEEPSEEK_API_KEY');
+
+  Future<String?> _namedSecret(String name) async {
+    final fromEnv = Platform.environment[name];
     if (fromEnv != null && fromEnv.trim().isNotEmpty) return fromEnv.trim();
     for (final path in [
       layout.credentialsFile,
@@ -948,21 +978,21 @@ class DshSidecar {
       final stored = File(path);
       if (!stored.existsSync()) continue;
       for (final raw in stored.readAsLinesSync()) {
-        final parsed = _parseEnvLine(raw, 'DEEPSEEK_API_KEY');
+        final parsed = parseEnvLine(raw, name);
         if (parsed != null) return parsed;
       }
     }
     final sourceEnv = File('${layout.museRoot}/.env.dsh.local');
     if (!layout.bundled && sourceEnv.existsSync()) {
       for (final raw in sourceEnv.readAsLinesSync()) {
-        final parsed = _parseEnvLine(raw, 'DEEPSEEK_API_KEY');
+        final parsed = parseEnvLine(raw, name);
         if (parsed != null) return parsed;
       }
     }
     return null;
   }
 
-  static String? _parseEnvLine(String raw, String name) {
+  static String? parseEnvLine(String raw, String name) {
     final line = raw.trim();
     if (line.isEmpty || line.startsWith('#')) return null;
     final index = line.indexOf('=');
@@ -977,6 +1007,42 @@ class DshSidecar {
     return value.isEmpty ? null : value;
   }
 
+  /// Insert or replace one `NAME=value` line without dropping other secrets.
+  static String upsertEnvFile(String existing, String name, String value) {
+    final lines = <String>[];
+    var replaced = false;
+    for (final raw in const LineSplitter().convert(existing)) {
+      final line = raw.trimRight();
+      if (line.isEmpty) continue;
+      final index = line.indexOf('=');
+      final key = index <= 0 ? '' : line.substring(0, index).trim();
+      if (key == name) {
+        lines.add('$name=$value');
+        replaced = true;
+      } else {
+        lines.add(line);
+      }
+    }
+    if (!replaced) lines.add('$name=$value');
+    return '${lines.join('\n')}\n';
+  }
+
+  /// Copy gateway defaults into `$DSH_HOME/settings.yaml` once (never overwrite).
+  static void seedGatewaySettings(DshRuntimeLayout resolved) {
+    final dest = File('${resolved.dshHome}/settings.yaml');
+    if (dest.existsSync()) return;
+    for (final candidate in [
+      '${resolved.museRoot}/defaults/settings.yaml',
+      '${resolved.museRoot}/middlewares/dsh/deploy/defaults/settings.yaml',
+    ]) {
+      final src = File(candidate);
+      if (!src.existsSync()) continue;
+      dest.parent.createSync(recursive: true);
+      src.copySync(dest.path);
+      return;
+    }
+  }
+
   Future<void> saveApiKey(String key) async {
     final trimmed = key.trim();
     if (trimmed.isEmpty) {
@@ -984,7 +1050,10 @@ class DshSidecar {
     }
     final file = File(layout.credentialsFile);
     await file.parent.create(recursive: true);
-    await file.writeAsString('DEEPSEEK_API_KEY=$trimmed\n');
+    final existing = file.existsSync() ? file.readAsStringSync() : '';
+    await file.writeAsString(
+      upsertEnvFile(existing, 'DEEPSEEK_API_KEY', trimmed),
+    );
     if (Platform.isMacOS || Platform.isLinux) {
       await Process.run('chmod', ['600', file.path]);
     }
